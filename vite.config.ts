@@ -14,6 +14,11 @@ export default defineConfig({
           // Copy ONNX Runtime WASM files to assets/
           src: '../node_modules/onnxruntime-web/dist/*.wasm',
           dest: 'assets'
+        },
+        {
+          // Copy extension icons to dist/icons/
+          src: 'icons/*',
+          dest: 'icons'
         }
       ]
     })
