@@ -119,6 +119,13 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'Save to Library',
     contexts: ['page']  // Show on right-click anywhere on page
   });
+
+  // Open library context menu (Phase 8)
+  chrome.contextMenus.create({
+    id: 'open-best-tts-library',
+    title: 'Open Best TTS Library',
+    contexts: ['page']  // Show on right-click anywhere
+  });
 });
 
 // Extended message type to include routing - use intersection since TTSMessage is a union
@@ -149,7 +156,8 @@ type ServiceWorkerMessage = TTSMessage
   | { type: 'get-pending-warning'; target: 'service-worker' }
   | { type: 'page-count-warning'; target: 'service-worker'; extractionId: string; pageCount: number; threshold: number }
   | { type: 'get-settings'; target: 'service-worker' }
-  | UpdateSettingsMessage;
+  | UpdateSettingsMessage
+  | { type: 'open-side-panel'; target: 'service-worker' };
 
 // Handle GET_TAB_ID requests - simple utility to let content script know its tab ID
 // This is used for rehydration logic to verify the content script is in the active playback tab
@@ -711,6 +719,18 @@ async function handleServiceWorkerMessage(
         break;
       }
 
+      case 'open-side-panel': {
+        // Get current tab and open side panel (Phase 8)
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id && chrome.sidePanel) {
+          await chrome.sidePanel.open({ tabId: tab.id });
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: 'Side Panel API not available' });
+        }
+        break;
+      }
+
       default:
         sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
     }
@@ -1001,6 +1021,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   // Handle Save to Library context menu
   if (info.menuItemId === 'save-to-library') {
     await handleSaveToLibraryContextMenu(tab);
+    return;
+  }
+
+  // Handle Open Library context menu (Phase 8)
+  if (info.menuItemId === 'open-best-tts-library') {
+    // Open side panel in the current tab
+    if (tab?.id && chrome.sidePanel) {
+      chrome.sidePanel.open({ tabId: tab.id }).catch(console.error);
+    }
     return;
   }
 
