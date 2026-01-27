@@ -8,6 +8,7 @@ import {
   type AudioEndedMessage,
   type AudioErrorMessage,
   type SkipToChunkMessage,
+  type ExtractionResult,
 } from '../lib/messages';
 import {
   getPlaybackState,
@@ -30,6 +31,19 @@ chrome.storage.local.get(['playbackSpeed']).then(({ playbackSpeed }) => {
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Best TTS extension installed');
+
+  // Create context menus
+  chrome.contextMenus.create({
+    id: 'best-tts-read-selection',
+    title: 'Read Selection with Best TTS',
+    contexts: ['selection']  // Only show when text selected
+  });
+
+  chrome.contextMenus.create({
+    id: 'best-tts-read-page',
+    title: 'Read This Page with Best TTS',
+    contexts: ['page']  // Show on right-click anywhere on page
+  });
 });
 
 // Extended message type to include routing - use intersection since TTSMessage is a union
@@ -422,6 +436,69 @@ async function generateChunk(
 // Reference to prevent unused function warning
 // generateChunk is called by playChunk above
 void generateChunk;
+
+// Context menu click handler
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab?.id) {
+    showNotification('Error', 'No active tab found');
+    return;
+  }
+
+  const messageType = info.menuItemId === 'best-tts-read-selection'
+    ? MessageType.EXTRACT_SELECTION
+    : MessageType.EXTRACT_ARTICLE;
+
+  try {
+    // Send extraction request to content script
+    // Content script will extract and return result via sendResponse
+    const result = await chrome.tabs.sendMessage(tab.id, {
+      target: 'content-script',
+      type: messageType
+    }) as ExtractionResult;
+
+    if (!result.success) {
+      showNotification('Extraction Failed', result.error || 'Could not extract content');
+      return;
+    }
+
+    // Successfully extracted - store text and metadata for later use by popup
+    await chrome.storage.session.set({
+      pendingExtraction: {
+        text: result.text,
+        title: result.title,
+        url: result.url,
+        source: result.source,
+        timestamp: Date.now()
+      }
+    });
+
+    // Open popup to show the extracted text and let user play it
+    // Note: Can't programmatically open popup, so show notification instead
+    showNotification(
+      'Ready to Read',
+      `"${result.title || 'Selected text'}" extracted. Click extension icon to play.`
+    );
+
+  } catch (error) {
+    console.error('Extraction failed:', error);
+    showNotification(
+      'Extraction Failed',
+      'Could not extract content. Make sure the page is fully loaded.'
+    );
+  }
+});
+
+/**
+ * Show notification to user
+ */
+function showNotification(title: string, message: string): void {
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: 'icons/icon-48.png',
+    title: `Best TTS: ${title}`,
+    message
+  });
+}
 
 // Listen for download progress from offscreen and broadcast to popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
