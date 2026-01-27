@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 8 of 8 (Side Panel Polish)
-Plan: 3 of 7 in current phase
+Plan: 5 of 7 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 08-03-PLAN.md (Settings Storage)
+Last activity: 2026-01-27 - Completed 08-05-PLAN.md (Settings Tab)
 
-Progress: [##################################-] ~90% (35/~39 plans estimated)
+Progress: [###################################] ~95% (37/~39 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 35
+- Total plans completed: 37
 - Average duration: 2.8 min
-- Total execution time: 98 min
+- Total execution time: 102 min
 
 **By Phase:**
 
@@ -34,10 +34,10 @@ Progress: [##################################-] ~90% (35/~39 plans estimated)
 | 05-floating-player | 5 | 12 min | 2.4 min |
 | 06-document-support | 5 | 11 min | 2.2 min |
 | 07-library | 5 | 17 min | 3.4 min |
-| 08-side-panel-polish | 3 | 6 min | 2 min |
+| 08-side-panel-polish | 5 | 10 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 3 min, 4 min, 3 min, 4 min, 3 min
+- Last 5 plans: 4 min, 3 min, 4 min, 3 min, 2 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -156,6 +156,10 @@ Recent decisions affecting current work:
 - (08-03) Settings stored in consolidated 'settings' key in chrome.storage.local
 - (08-03) Migration runs once on service worker load, deletes legacy keys after migration
 - (08-03) ShortcutBindings interface for in-panel keyboard shortcuts (not global Chrome shortcuts)
+- (08-05) Voice dropdown shows Grade A voices first with "High Quality" indicator
+- (08-05) Theme toggle uses settings-storage module for persistence
+- (08-05) Shortcuts displayed read-only with link to chrome://extensions/shortcuts
+- (08-05) Voice preview button placeholder for 08-06 implementation
 
 ### Pending Todos
 
@@ -170,9 +174,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T12:49:00Z
-Stopped at: Completed 08-03-PLAN.md (Settings Storage)
+Last session: 2026-01-27T12:57:00Z
+Stopped at: Completed 08-05-PLAN.md (Settings Tab)
 Resume file: None
 
 ---
-*Next action: Continue with 08-04-PLAN.md or remaining Phase 8 plans.*
+*Next action: Continue with 08-06-PLAN.md or remaining Phase 8 plans.*
