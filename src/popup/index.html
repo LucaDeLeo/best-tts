@@ -43,6 +43,54 @@
         </div>
       </div>
 
+      <!-- File Import Section -->
+      <div class="section file-import-section">
+        <div class="section-header">Import Document</div>
+        <div class="file-import-row">
+          <input type="file"
+                 id="file-input"
+                 accept=".pdf,.txt,.md"
+                 class="hidden">
+          <button id="import-file-btn" class="btn secondary">
+            Import File
+          </button>
+          <span id="supported-formats" class="hint">PDF, TXT, MD</span>
+        </div>
+
+        <!-- File size warning dialog (hidden by default) -->
+        <div id="file-size-warning" class="warning-dialog hidden">
+          <div class="warning-content">
+            <div class="warning-icon">Warning</div>
+            <div class="warning-text">
+              <strong>Large File</strong>
+              <p id="file-size-message">This file is over 50 MB. Processing may be slow.</p>
+            </div>
+            <div class="warning-actions">
+              <button id="file-cancel-btn" class="btn secondary small">Cancel</button>
+              <button id="file-continue-btn" class="btn primary small">Continue</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Import progress (hidden by default) -->
+        <div id="import-progress" class="import-progress hidden">
+          <div class="import-progress-header">
+            <span id="import-filename">filename.pdf</span>
+            <button id="cancel-import-btn" class="btn-icon-only" title="Cancel import">&#10005;</button>
+          </div>
+          <div class="progress-bar">
+            <div id="import-progress-fill" class="progress-fill"></div>
+          </div>
+          <span id="import-progress-text" class="progress-text">Uploading...</span>
+        </div>
+
+        <!-- Import status (shown after import) -->
+        <div id="import-status" class="extraction-status hidden">
+          <span id="import-source"></span>
+          <button id="clear-import-btn" class="btn-icon-only" title="Clear import">&#10005;</button>
+        </div>
+      </div>
+
       <!-- Text Input -->
       <div class="input-group">
         <label for="text-input">Text to speak</label>
