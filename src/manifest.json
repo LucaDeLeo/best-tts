@@ -3,7 +3,7 @@
   "name": "Best TTS",
   "version": "0.1.0",
   "description": "High-quality local TTS",
-  "permissions": ["offscreen", "storage", "activeTab", "scripting"],
+  "permissions": ["offscreen", "storage", "activeTab", "scripting", "contextMenus", "notifications"],
   "host_permissions": [
     "https://huggingface.co/*",
     "https://*.huggingface.co/*",
