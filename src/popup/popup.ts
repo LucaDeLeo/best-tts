@@ -9,6 +9,7 @@ import {
   type ExtractionResult,
   type DocumentType,
   type DocumentExtractionResult,
+  type PendingWarning,
 } from '../lib/messages';
 import { getSelectedVoice, setSelectedVoice } from '../lib/voice-storage';
 import { getDownloadProgress } from '../lib/model-cache';
@@ -81,6 +82,9 @@ let playbackSpeed = 1.0;
 let pendingFile: File | null = null;
 let currentExtractionId: string | null = null;
 
+// Pending warning state (for extraction warnings like page count or text length)
+let pendingWarning: PendingWarning | null = null;
+
 /**
  * Initialize popup
  */
@@ -116,6 +120,9 @@ async function init() {
 
   // Check for pending extraction (from context menu OR popup that closed mid-extraction)
   await loadPendingExtraction();
+
+  // Check for pending extraction warning (page count or text length)
+  await checkPendingWarning();
 
   // Keyboard shortcuts (with focus guard)
   document.addEventListener('keydown', handleKeydown);
@@ -161,6 +168,10 @@ async function init() {
           ? 'Loading document...'
           : `Extracting... ${msg.progress}%`;
       }
+    }
+    // Handle extraction warning (page count or text length exceeded)
+    if (msg.type === MessageType.EXTRACTION_WARNING) {
+      showExtractionWarning(msg.warning);
     }
   });
 
@@ -836,6 +847,49 @@ async function loadPendingExtraction() {
 }
 
 /**
+ * Check for pending warning when popup opens.
+ * Per CONTEXT.md Decision #6: Popup surfaces pending warnings.
+ */
+async function checkPendingWarning() {
+  try {
+    const result = await sendToServiceWorker<{ warning: PendingWarning | null }>(
+      MessageType.GET_PENDING_WARNING
+    );
+
+    if (result.warning) {
+      showExtractionWarning(result.warning);
+    }
+  } catch {
+    // Service worker might not be ready
+  }
+}
+
+/**
+ * Show extraction warning dialog.
+ * Reuses the file size warning dialog for consistency.
+ */
+function showExtractionWarning(warning: PendingWarning) {
+  let warningMessage: string;
+  switch (warning.type) {
+    case 'pageCount':
+      warningMessage = `This PDF has ${warning.value} pages (threshold: ${warning.threshold}). Processing may be slow.`;
+      break;
+    case 'textLength':
+      warningMessage = `Extracted text is ${warning.value.toLocaleString()} characters (threshold: ${warning.threshold.toLocaleString()}). This is a lot of content to process.`;
+      break;
+    default:
+      warningMessage = 'This file exceeds recommended limits.';
+  }
+
+  // Reuse the file size warning dialog
+  fileSizeMessage.textContent = warningMessage;
+  fileSizeWarning.classList.remove('hidden');
+
+  // Store warning for response
+  pendingWarning = warning;
+}
+
+/**
  * Display extracted content in the UI
  */
 function showExtractedContent(result: ExtractionResult) {
@@ -905,16 +959,58 @@ async function handleFileSelect() {
 
 /**
  * Cancel file size warning (user chose not to proceed).
+ * Handles both file size and extraction warnings.
  */
-function cancelFileSizeWarning() {
+async function cancelFileSizeWarning() {
+  // Handle extraction warning (page count or text length)
+  if (pendingWarning) {
+    await sendToServiceWorker(MessageType.WARNING_RESPONSE, {
+      extractionId: pendingWarning.extractionId,
+      action: 'cancel'
+    }).catch(() => {});
+    pendingWarning = null;
+    fileSizeWarning.classList.add('hidden');
+    showMessage('Extraction cancelled', 'error');
+    return;
+  }
+
+  // Handle file size warning
   pendingFile = null;
   fileSizeWarning.classList.add('hidden');
 }
 
 /**
  * Continue with large file after warning.
+ * Handles both file size and extraction warnings.
  */
 async function continueWithLargeFile() {
+  // Handle extraction warning (page count or text length)
+  if (pendingWarning) {
+    const warning = pendingWarning;
+    pendingWarning = null;
+    fileSizeWarning.classList.add('hidden');
+
+    // Send continue response to service worker
+    const result = await sendToServiceWorker<DocumentExtractionResult>(
+      MessageType.WARNING_RESPONSE,
+      {
+        extractionId: warning.extractionId,
+        action: 'continue'
+      }
+    );
+
+    // Handle the extraction result
+    if (result.success && result.text) {
+      handleExtractionResult(result, result.title || 'Document');
+    } else if (!result.success) {
+      showMessage(result.error || 'Extraction failed', 'error');
+    }
+    // If no result yet (for page count warning), extraction continues
+    // and will send result when complete
+    return;
+  }
+
+  // Handle file size warning
   if (!pendingFile) return;
 
   const file = pendingFile;
