@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 3 - Content Extraction (Complete)
+**Current focus:** Phase 4 - Text Highlighting (In Progress)
 
 ## Current Position
 
-Phase: 3 of 8 (Content Extraction)
-Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-01-27 - Completed 03-04-PLAN.md (Popup Extraction UI)
+Phase: 4 of 8 (Text Highlighting)
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-01-27 - Completed 04-01-PLAN.md (Highlight Manager Foundation)
 
-Progress: [############] ~38% (12/~32 plans estimated)
+Progress: [#############] ~41% (13/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: 3.1 min
-- Total execution time: 37 min
+- Total plans completed: 13
+- Average duration: 3.2 min
+- Total execution time: 41 min
 
 **By Phase:**
 
@@ -30,9 +30,10 @@ Progress: [############] ~38% (12/~32 plans estimated)
 | 01-tts-engine | 4 | 16 min | 4 min |
 | 02-basic-playback | 4 | 12 min | 3 min |
 | 03-content-extraction | 4 | 9 min | 2.25 min |
+| 04-text-highlighting | 1 | 4 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 2 min, 2 min, 2 min, 3 min
+- Last 5 plans: 2 min, 2 min, 3 min, 4 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - (03-04) 15s popup timeout (content script has 10s internal timeout)
 - (03-04) 5-minute expiry for pending extractions in session storage
 - (03-04) storePendingExtraction() shared between popup-close fallback and context menu
+- (04-01) Added Intl.Segmenter type declarations (ES2022 lib not loading properly)
+- (04-01) Updated tsconfig.json with ES2022 lib for Intl support
+- (04-01) 3-second user scroll debounce before auto-scroll resumes
 
 ### Pending Todos
 
@@ -94,9 +98,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T06:53:00Z
-Stopped at: Completed 03-04-PLAN.md (Popup Extraction UI) - Phase 3 complete
+Last session: 2026-01-27T07:48:00Z
+Stopped at: Completed 04-01-PLAN.md (Highlight Manager Foundation)
 Resume file: None
 
 ---
-*Next action: Begin Phase 4 (Voice Customization)*
+*Next action: Execute 04-02-PLAN.md (Overlay Mode)*
