@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 5 of 8 (Floating Player)
-Plan: 2 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 05-02-PLAN.md (Playback Controls)
+Last activity: 2026-01-27 - Completed 05-03-PLAN.md (State Sync)
 
-Progress: [###################] ~59% (19/~32 plans estimated)
+Progress: [####################] ~62% (20/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18
-- Average duration: 2.8 min
-- Total execution time: 51 min
+- Total plans completed: 20
+- Average duration: 2.85 min
+- Total execution time: 57 min
 
 **By Phase:**
 
@@ -31,10 +31,10 @@ Progress: [###################] ~59% (19/~32 plans estimated)
 | 02-basic-playback | 4 | 12 min | 3 min |
 | 03-content-extraction | 4 | 9 min | 2.25 min |
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
-| 05-floating-player | 2 | 4 min | 2 min |
+| 05-floating-player | 3 | 8 min | 2.7 min |
 
 **Recent Trend:**
-- Last 5 plans: 1 min, 3 min, 3 min, 2 min, 2 min
+- Last 5 plans: 3 min, 3 min, 2 min, 2 min, 4 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -105,6 +105,9 @@ Recent decisions affecting current work:
 - (05-02) Dismiss button sends STOP_PLAYBACK to service worker
 - (05-02) Progress "X / Y" format, Speed "X.Xx" format
 - (05-02) Focus-scoped keyboard shortcuts (Space, Escape, Arrows)
+- (05-03) SW owns authoritative state, content script holds derived/cached copy
+- (05-03) GET_STATUS returns explicit boolean fields for UI sync (isPlaying, isPaused, isGenerating)
+- (05-03) Content script requests initial state on load for page refresh sync
 
 ### Pending Todos
 
@@ -119,9 +122,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T08:57:04Z
-Stopped at: Completed 05-02-PLAN.md (Playback Controls)
+Last session: 2026-01-27T08:59:00Z
+Stopped at: Completed 05-03-PLAN.md (State Sync)
 Resume file: None
 
 ---
-*Next action: Continue with 05-03-PLAN.md (State Sync)*
+*Next action: Continue with 05-04-PLAN.md (Playback Control Wiring)*
