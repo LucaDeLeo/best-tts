@@ -1,4 +1,15 @@
-import { MessageType, type TTSResponse, type VoiceListResponse, type ExtractionResult } from '../lib/messages';
+import {
+  MessageType,
+  EXTRACTION_THRESHOLDS,
+  generateExtractionId,
+  needsChunkedUpload,
+  calculateChunkCount,
+  type TTSResponse,
+  type VoiceListResponse,
+  type ExtractionResult,
+  type DocumentType,
+  type DocumentExtractionResult,
+} from '../lib/messages';
 import { getSelectedVoice, setSelectedVoice } from '../lib/voice-storage';
 import { getDownloadProgress } from '../lib/model-cache';
 import type { VoiceId } from '../lib/tts-engine';
@@ -36,6 +47,22 @@ const extractionStatus = document.getElementById('extraction-status')!;
 const extractionSource = document.getElementById('extraction-source')!;
 const clearExtractionBtn = document.getElementById('clear-extraction-btn') as HTMLButtonElement;
 
+// File import elements
+const fileInput = document.getElementById('file-input') as HTMLInputElement;
+const importFileBtn = document.getElementById('import-file-btn') as HTMLButtonElement;
+const fileSizeWarning = document.getElementById('file-size-warning')!;
+const fileSizeMessage = document.getElementById('file-size-message')!;
+const fileCancelBtn = document.getElementById('file-cancel-btn') as HTMLButtonElement;
+const fileContinueBtn = document.getElementById('file-continue-btn') as HTMLButtonElement;
+const importProgress = document.getElementById('import-progress')!;
+const importFilename = document.getElementById('import-filename')!;
+const cancelImportBtn = document.getElementById('cancel-import-btn') as HTMLButtonElement;
+const importProgressFill = document.getElementById('import-progress-fill')!;
+const importProgressText = document.getElementById('import-progress-text')!;
+const importStatus = document.getElementById('import-status')!;
+const importSource = document.getElementById('import-source')!;
+const clearImportBtn = document.getElementById('clear-import-btn') as HTMLButtonElement;
+
 // Show player button (restores dismissed floating player)
 const showPlayerBtn = document.getElementById('show-player-btn') as HTMLButtonElement;
 
@@ -49,6 +76,10 @@ let isGenerating = false;
 let currentChunkIndex = 0;
 let totalChunks = 0;
 let playbackSpeed = 1.0;
+
+// File import state
+let pendingFile: File | null = null;
+let currentExtractionId: string | null = null;
 
 /**
  * Initialize popup
@@ -71,6 +102,14 @@ async function init() {
   readPageBtn.addEventListener('click', handleReadPage);
   readSelectionBtn.addEventListener('click', handleReadSelection);
   clearExtractionBtn.addEventListener('click', clearExtraction);
+
+  // File import listeners
+  importFileBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', handleFileSelect);
+  fileCancelBtn.addEventListener('click', cancelFileSizeWarning);
+  fileContinueBtn.addEventListener('click', continueWithLargeFile);
+  cancelImportBtn.addEventListener('click', handleCancelImport);
+  clearImportBtn.addEventListener('click', clearImport);
 
   // Show player button listener
   showPlayerBtn.addEventListener('click', handleShowPlayer);
@@ -110,6 +149,18 @@ async function init() {
     if (msg.type === MessageType.AUDIO_ERROR) {
       handlePlaybackComplete();
       showMessage(msg.error || 'Audio playback failed', 'error');
+    }
+    // Handle extraction progress
+    if (msg.type === MessageType.EXTRACTION_PROGRESS) {
+      if (msg.extractionId === currentExtractionId) {
+        const basePercent = 50; // Upload is first 50%
+        const extractionPercent = Math.round(msg.progress / 2); // Extraction is next 50%
+        const totalPercent = basePercent + extractionPercent;
+        importProgressFill.style.width = `${totalPercent}%`;
+        importProgressText.textContent = msg.stage === 'uploading'
+          ? 'Loading document...'
+          : `Extracting... ${msg.progress}%`;
+      }
     }
   });
 
@@ -814,6 +865,236 @@ function clearExtraction() {
   extractionStatus.classList.add('hidden');
   updatePlayButtonState();
   showMessage('Ready', 'success');
+}
+
+// ============================================================================
+// File Import Functions
+// ============================================================================
+
+/**
+ * Handle file selection from input.
+ * Per CONTEXT.md Decision #6: Check file.size BEFORE file.arrayBuffer()
+ */
+async function handleFileSelect() {
+  const file = fileInput.files?.[0];
+  if (!file) return;
+
+  // Reset input for re-selection of same file
+  fileInput.value = '';
+
+  // Validate file type
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (!ext || !['pdf', 'txt', 'md'].includes(ext)) {
+    showMessage('Unsupported file type. Please select PDF, TXT, or MD file.', 'error');
+    return;
+  }
+
+  // Check file size BEFORE reading into memory
+  if (file.size > EXTRACTION_THRESHOLDS.FILE_SIZE_BYTES) {
+    // Show warning dialog
+    pendingFile = file;
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+    fileSizeMessage.textContent = `This file is ${sizeMB} MB. Processing may be slow and could fail.`;
+    fileSizeWarning.classList.remove('hidden');
+    return;
+  }
+
+  // Proceed with import
+  await startFileImport(file);
+}
+
+/**
+ * Cancel file size warning (user chose not to proceed).
+ */
+function cancelFileSizeWarning() {
+  pendingFile = null;
+  fileSizeWarning.classList.add('hidden');
+}
+
+/**
+ * Continue with large file after warning.
+ */
+async function continueWithLargeFile() {
+  if (!pendingFile) return;
+
+  const file = pendingFile;
+  pendingFile = null;
+  fileSizeWarning.classList.add('hidden');
+
+  await startFileImport(file);
+}
+
+/**
+ * Start file import process.
+ * Per CONTEXT.md Decision #2: Different strategies for small vs large files.
+ */
+async function startFileImport(file: File) {
+  const ext = file.name.split('.').pop()?.toLowerCase() as DocumentType;
+  const extractionId = generateExtractionId();
+  currentExtractionId = extractionId;
+
+  // Show progress UI
+  importFilename.textContent = file.name;
+  importProgressFill.style.width = '0%';
+  importProgressText.textContent = 'Reading file...';
+  importProgress.classList.remove('hidden');
+  importFileBtn.disabled = true;
+
+  try {
+    if (needsChunkedUpload(file.size)) {
+      // Large file: chunked upload per CONTEXT.md
+      await uploadFileChunked(file, ext, extractionId);
+    } else {
+      // Small file: direct send
+      await uploadFileDirect(file, ext, extractionId);
+    }
+  } catch (error) {
+    console.error('File import failed:', error);
+    showMessage(error instanceof Error ? error.message : 'File import failed', 'error');
+    hideImportProgress();
+  }
+}
+
+/**
+ * Upload small file directly (< 10 MB).
+ */
+async function uploadFileDirect(file: File, documentType: DocumentType, extractionId: string) {
+  importProgressText.textContent = 'Reading file...';
+  importProgressFill.style.width = '10%';
+
+  const data = await file.arrayBuffer();
+
+  // Check for cancellation
+  if (currentExtractionId !== extractionId) return;
+
+  importProgressText.textContent = 'Extracting text...';
+  importProgressFill.style.width = '50%';
+
+  // Send to service worker
+  const result = await sendToServiceWorker<DocumentExtractionResult>(
+    MessageType.EXTRACT_DOCUMENT,
+    {
+      documentType,
+      data,
+      filename: file.name,
+      fileSize: file.size,
+      extractionId
+    }
+  );
+
+  handleExtractionResult(result, file.name);
+}
+
+/**
+ * Upload large file in chunks (> 10 MB).
+ * Per CONTEXT.md Decision #2: Streamed chunking with file.slice()
+ */
+async function uploadFileChunked(file: File, documentType: DocumentType, extractionId: string) {
+  const chunkSize = EXTRACTION_THRESHOLDS.CHUNK_SIZE_BYTES;
+  const totalChunksCount = calculateChunkCount(file.size);
+
+  // Send initial message with null data
+  await sendToServiceWorker(MessageType.EXTRACT_DOCUMENT, {
+    documentType,
+    data: null,
+    filename: file.name,
+    fileSize: file.size,
+    extractionId
+  });
+
+  // Send chunks one at a time
+  for (let i = 0; i < totalChunksCount; i++) {
+    // Check for cancellation
+    if (currentExtractionId !== extractionId) return;
+
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, file.size);
+    const slice = file.slice(start, end);
+    const data = await slice.arrayBuffer();
+
+    // Update progress
+    const percent = Math.round(((i + 1) / totalChunksCount) * 50); // 50% for upload
+    importProgressFill.style.width = `${percent}%`;
+    importProgressText.textContent = `Uploading... ${i + 1}/${totalChunksCount}`;
+
+    // Send chunk
+    await sendToServiceWorker(MessageType.DOCUMENT_CHUNK, {
+      extractionId,
+      chunkIndex: i,
+      totalChunks: totalChunksCount,
+      data
+    });
+  }
+
+  // Signal upload complete
+  importProgressText.textContent = 'Extracting text...';
+  importProgressFill.style.width = '50%';
+
+  const result = await sendToServiceWorker<DocumentExtractionResult>(
+    MessageType.DOCUMENT_CHUNK_COMPLETE,
+    { extractionId }
+  );
+
+  handleExtractionResult(result, file.name);
+}
+
+/**
+ * Handle extraction result from service worker.
+ */
+function handleExtractionResult(result: DocumentExtractionResult, filename: string) {
+  hideImportProgress();
+
+  if (!result.success) {
+    showMessage(result.error || 'Extraction failed', 'error');
+    return;
+  }
+
+  // Populate text input
+  if (result.text) {
+    textInput.value = result.text;
+    updatePlayButtonState();
+  }
+
+  // Show import status
+  const label = result.pageCount
+    ? `${filename} (${result.pageCount} pages, ${result.textLength?.toLocaleString()} chars)`
+    : `${filename} (${result.textLength?.toLocaleString()} chars)`;
+  importSource.textContent = label;
+  importStatus.classList.remove('hidden');
+
+  showMessage('Document imported! Click Play to listen.', 'success');
+}
+
+/**
+ * Handle cancel import button.
+ */
+async function handleCancelImport() {
+  if (currentExtractionId) {
+    await sendToServiceWorker(MessageType.CANCEL_EXTRACTION, {
+      extractionId: currentExtractionId
+    }).catch(() => {});
+    currentExtractionId = null;
+  }
+  hideImportProgress();
+}
+
+/**
+ * Clear imported document.
+ */
+function clearImport() {
+  textInput.value = '';
+  importStatus.classList.add('hidden');
+  updatePlayButtonState();
+  showMessage('Ready', 'success');
+}
+
+/**
+ * Hide import progress UI and re-enable button.
+ */
+function hideImportProgress() {
+  importProgress.classList.add('hidden');
+  importFileBtn.disabled = false;
+  currentExtractionId = null;
 }
 
 // Initialize on load
