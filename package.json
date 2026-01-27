@@ -27,7 +27,8 @@
     "@mozilla/readability": "^0.6.0",
     "idb-keyval": "^6.2.2",
     "kokoro-js": "^1.2.1",
-    "onnxruntime-web": "^1.23.2"
+    "onnxruntime-web": "^1.23.2",
+    "pdfjs-dist": "^4.8.69"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.3.0",
