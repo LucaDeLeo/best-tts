@@ -17,6 +17,9 @@ console.log('Side panel loaded');
 // State
 let currentSettings: Settings | null = null;
 
+// Audio state for voice preview
+let previewAudio: HTMLAudioElement | null = null;
+
 // Library state
 let folders: FolderData[] = [];
 let libraryItems: LibraryItem[] = [];
@@ -674,8 +677,25 @@ function formatVoiceName(voiceId: string, isHighQuality: boolean): string {
 }
 
 /**
+ * Stop any playing preview audio
+ * Per CONTEXT.md: Cancel previous preview before starting new one
+ */
+function stopPreviewAudio() {
+  if (previewAudio) {
+    previewAudio.pause();
+    const currentSrc = previewAudio.src;
+    previewAudio.src = '';
+    // Revoke the object URL to free memory
+    if (currentSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(currentSrc);
+    }
+    previewAudio = null;
+  }
+}
+
+/**
  * Handle voice preview button click
- * Placeholder - full implementation in 08-06
+ * Per CONTEXT.md Decision #5: Play preview directly in side panel
  */
 async function handleVoicePreview() {
   const voiceSelect = document.getElementById('voice-select') as HTMLSelectElement;
@@ -683,17 +703,62 @@ async function handleVoicePreview() {
 
   if (!voiceSelect || !previewBtn) return;
 
+  // Cancel any existing preview per CONTEXT.md
+  stopPreviewAudio();
+
   previewBtn.disabled = true;
   previewBtn.textContent = 'Generating...';
 
   try {
-    // Placeholder - will be implemented in 08-06
-    // For now, just show a brief message
-    await new Promise(resolve => setTimeout(resolve, 500));
-    console.log(`Voice preview for "${voiceSelect.value}" will be implemented in plan 08-06`);
-  } finally {
+    // Request preview from service worker
+    const response = await sendToServiceWorker<{
+      success: boolean;
+      audioData?: string;
+      audioMimeType?: string;
+      error?: string;
+    }>(MessageType.VOICE_PREVIEW, { voice: voiceSelect.value });
+
+    if (!response.success || !response.audioData) {
+      throw new Error(response.error || 'No audio data received');
+    }
+
+    // Convert base64 to blob
+    const binaryString = atob(response.audioData);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: response.audioMimeType || 'audio/wav' });
+
+    // Create audio element and play
+    const audioUrl = URL.createObjectURL(blob);
+    previewAudio = new Audio(audioUrl);
+
+    // Update button state during playback
+    previewBtn.textContent = 'Playing...';
+
+    previewAudio.addEventListener('ended', () => {
+      stopPreviewAudio();
+      previewBtn.disabled = false;
+      previewBtn.textContent = 'Preview Voice';
+    });
+
+    previewAudio.addEventListener('error', () => {
+      console.error('Preview audio playback error');
+      stopPreviewAudio();
+      previewBtn.disabled = false;
+      previewBtn.textContent = 'Preview Voice';
+    });
+
+    await previewAudio.play();
+  } catch (error) {
+    console.error('Voice preview failed:', error);
     previewBtn.disabled = false;
     previewBtn.textContent = 'Preview Voice';
+
+    // Show error to user
+    const errorMsg = error instanceof Error ? error.message : 'Preview failed';
+    alert(`Could not preview voice: ${errorMsg}`);
   }
 }
 
