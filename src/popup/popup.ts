@@ -14,6 +14,7 @@ import {
 } from '../lib/messages';
 import { getSelectedVoice, setSelectedVoice } from '../lib/voice-storage';
 import { getDownloadProgress } from '../lib/model-cache';
+import { getSettings } from '../lib/settings-storage';
 import type { VoiceId } from '../lib/tts-engine';
 import type { LibraryItem } from '../lib/library-types';
 
@@ -144,10 +145,99 @@ let libraryItems: LibraryItemData[] = [];
 let folders: FolderData[] = [];
 
 /**
+ * Check if Side Panel API is available
+ * Per CONTEXT.md: Graceful fallback if API unavailable
+ */
+function isSidePanelAvailable(): boolean {
+  return typeof chrome.sidePanel !== 'undefined';
+}
+
+/**
+ * Apply theme from settings
+ */
+async function applyTheme() {
+  const settings = await getSettings();
+  const html = document.documentElement;
+
+  if (settings.darkMode === 'dark') {
+    html.classList.add('dark-mode');
+    html.classList.remove('light-mode');
+  } else if (settings.darkMode === 'light') {
+    html.classList.remove('dark-mode');
+    html.classList.add('light-mode');
+  } else {
+    // System preference
+    html.classList.remove('dark-mode', 'light-mode');
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      html.classList.add('dark-mode');
+    }
+  }
+}
+
+/**
+ * Create side panel button in header
+ */
+function addSidePanelButton() {
+  // Only show if API is available
+  if (!isSidePanelAvailable()) {
+    console.log('Side Panel API not available, hiding button');
+    return;
+  }
+
+  const headerActions = document.querySelector('.header-actions');
+  if (!headerActions) {
+    // Create header-actions if it doesn't exist
+    const header = document.querySelector('header');
+    if (!header) return;
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'header-actions';
+    header.appendChild(actionsDiv);
+  }
+
+  const container = document.querySelector('.header-actions');
+  if (!container) return;
+
+  // Insert the side panel button at the beginning of header actions
+  const btn = document.createElement('button');
+  btn.id = 'open-sidepanel-btn';
+  btn.className = 'icon-btn';
+  btn.title = 'Open Library';
+  btn.textContent = '\u2630'; // Hamburger menu icon
+
+  btn.addEventListener('click', openSidePanel);
+
+  // Insert at the beginning
+  container.insertBefore(btn, container.firstChild);
+}
+
+/**
+ * Open side panel
+ */
+async function openSidePanel() {
+  try {
+    await chrome.runtime.sendMessage({
+      target: 'service-worker',
+      type: 'open-side-panel'
+    });
+    // Close popup after opening side panel
+    window.close();
+  } catch (error) {
+    console.error('Failed to open side panel:', error);
+  }
+}
+
+/**
  * Initialize popup
  */
 async function init() {
   console.log('Popup initializing...');
+
+  // Apply theme from settings (Phase 8)
+  await applyTheme();
+
+  // Add side panel button if API available (Phase 8)
+  addSidePanelButton();
 
   // Set up event listeners
   playBtn.addEventListener('click', handlePlay);
@@ -251,6 +341,13 @@ async function init() {
     // Handle extraction warning (page count or text length exceeded)
     if (msg.type === MessageType.EXTRACTION_WARNING) {
       showExtractionWarning(msg.warning);
+    }
+  });
+
+  // Listen for theme changes (Phase 8)
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'local' && changes.settings) {
+      applyTheme();
     }
   });
 
