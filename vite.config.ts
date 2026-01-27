@@ -12,8 +12,16 @@ export default defineConfig({
       targets: [
         {
           // Copy ONNX Runtime WASM files to assets/
+          // Note: ../node_modules because vite root is 'src'
           src: '../node_modules/onnxruntime-web/dist/*.wasm',
           dest: 'assets'
+        },
+        {
+          // Copy PDF.js worker for external worker mode
+          // Note: ../node_modules because vite root is 'src'
+          src: '../node_modules/pdfjs-dist/build/pdf.worker.mjs',
+          dest: 'assets',
+          rename: 'pdf.worker.mjs'
         },
         {
           // Copy extension icons to dist/icons/
