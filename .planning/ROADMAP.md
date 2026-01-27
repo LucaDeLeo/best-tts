@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Content Extraction** - Read selected text and full webpages
 - [x] **Phase 4: Text Highlighting** - Sync text display with audio playback
 - [x] **Phase 5: Floating Player** - Mini player UI on any webpage
-- [ ] **Phase 6: Document Support** - Import and read PDFs and text files
+- [x] **Phase 6: Document Support** - Import and read PDFs and text files
 - [ ] **Phase 7: Library** - Save, organize, and resume documents
 - [ ] **Phase 8: Side Panel & Polish** - Full UI, settings, dark mode
 
@@ -141,12 +141,17 @@ Plans:
   2. Text extraction works on standard text-based PDFs
   3. User can open plain text files (.txt, .md) for reading
   4. Import UI is accessible from extension popup or side panel
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves
 
 Plans:
-- [ ] 06-01: TBD
+- [x] 06-01-PLAN.md — PDF.js dependency, message types, offscreen handler shell
+- [x] 06-02-PLAN.md — PDF extraction with normalization and error handling
+- [x] 06-03-PLAN.md — Text file extraction with encoding detection
+- [x] 06-04-PLAN.md — Popup UI for file import with size warnings
+- [x] 06-05-PLAN.md — Service worker handlers, cancellation, pending warnings
 
-**Research Flag**: Needs research-phase (PDF.js integration, memory management)
+**Context**: Completed (CONTEXT.md - chunked uploads, soft limits, offscreen extraction)
+**Completed**: 2026-01-27
 
 ### Phase 7: Library
 **Goal**: User can save content and resume reading across sessions
@@ -192,10 +197,10 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 3. Content Extraction | 4/4 | ✓ Complete | 2026-01-27 |
 | 4. Text Highlighting | 5/5 | ✓ Complete | 2026-01-27 |
 | 5. Floating Player | 5/5 | ✓ Complete | 2026-01-27 |
-| 6. Document Support | 0/? | Not started | - |
+| 6. Document Support | 5/5 | ✓ Complete | 2026-01-27 |
 | 7. Library | 0/? | Not started | - |
 | 8. Side Panel & Polish | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27 — Phase 5 complete*
+*Last updated: 2026-01-27 — Phase 6 complete*
