@@ -2,9 +2,15 @@ import {
   MessageType,
   type PlayAudioMessage,
   type SetSpeedMessage,
-  type ExtractionResult
+  type ExtractionResult,
+  type InitHighlightingMessage
 } from '../lib/messages';
 import { getSelectedText, extractArticle } from '../lib/content-extractor';
+import type { HighlightState } from '../lib/highlight-types';
+import { highlightSentence, clearHighlight, maybeScrollToSentence } from '../lib/highlight-manager';
+import { createSelectionHighlighting, cleanupSelectionHighlighting } from '../lib/selection-highlighter';
+import { renderOverlayContent, removeOverlayContainer } from '../lib/overlay-highlighter';
+import { injectHighlightStyles, removeHighlightStyles } from './highlight-styles';
 
 console.log('Best TTS content script loaded');
 
@@ -17,6 +23,9 @@ let currentSpeed: number = 1.0;
 // Heartbeat interval
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 const HEARTBEAT_INTERVAL_MS = 2000; // 2 seconds per CONTEXT.md
+
+// Highlight state
+let highlightState: HighlightState | null = null;
 
 // Message handler
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -58,13 +67,16 @@ async function handleMessage(message: any): Promise<any> {
     case MessageType.EXTRACT_ARTICLE:
       return handleExtractArticle();
 
+    case MessageType.INIT_HIGHLIGHTING:
+      return handleInitHighlighting(message as InitHighlightingMessage);
+
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };
   }
 }
 
 async function handlePlayAudio(msg: PlayAudioMessage): Promise<{ success: boolean; error?: string }> {
-  const { audioData, audioMimeType, generationToken } = msg;
+  const { audioData, audioMimeType, generationToken, chunkIndex } = msg;
 
   // Stop any existing playback
   await cleanupAudio();
@@ -83,6 +95,12 @@ async function handlePlayAudio(msg: PlayAudioMessage): Promise<{ success: boolea
   // Store new state
   currentAudioUrl = audioUrl;
   currentGenerationToken = generationToken;
+
+  // Highlight the current sentence
+  if (highlightState && highlightState.isValid) {
+    highlightSentence(highlightState, chunkIndex);
+    maybeScrollToSentence(highlightState);
+  }
 
   // Create and configure audio element
   currentAudio = new Audio(audioUrl);
@@ -148,6 +166,7 @@ async function handleResume(): Promise<{ success: boolean; error?: string }> {
 
 async function handleStop(): Promise<{ success: boolean }> {
   await cleanupAudio();
+  cleanupHighlighting();
   return { success: true };
 }
 
@@ -289,3 +308,60 @@ async function cleanupAudio(): Promise<void> {
 
   currentGenerationToken = null;
 }
+
+/**
+ * Clean up highlighting state and restore DOM.
+ */
+function cleanupHighlighting(): void {
+  if (!highlightState) return;
+
+  if (highlightState.mode === 'selection') {
+    cleanupSelectionHighlighting(highlightState);
+  } else {
+    removeOverlayContainer();
+  }
+
+  removeHighlightStyles();
+  highlightState = null;
+}
+
+/**
+ * Handle initialization of highlighting mode.
+ * Called before TTS playback starts to set up DOM spans.
+ */
+async function handleInitHighlighting(msg: InitHighlightingMessage): Promise<{
+  success: boolean;
+  chunks?: string[];
+  error?: string;
+}> {
+  // Cleanup any existing highlighting
+  cleanupHighlighting();
+
+  // Inject highlight styles
+  injectHighlightStyles();
+
+  if (msg.mode === 'overlay') {
+    const result = renderOverlayContent(msg.title, msg.text);
+    highlightState = result.state;
+    return { success: true, chunks: result.chunks };
+  } else {
+    // Selection mode - get current selection
+    const selection = window.getSelection();
+    if (!selection) {
+      return { success: false, error: 'No selection available' };
+    }
+
+    const result = createSelectionHighlighting(selection);
+    if (!result) {
+      return { success: false, error: 'Could not highlight selection' };
+    }
+
+    highlightState = result.state;
+    return { success: true, chunks: result.chunks };
+  }
+}
+
+// Cleanup highlighting on page unload
+window.addEventListener('beforeunload', () => {
+  cleanupHighlighting();
+});
