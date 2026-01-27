@@ -1,13 +1,23 @@
-import { MessageType, type TTSMessage, type TTSResponse, type VoiceListResponse } from '../lib/messages';
+import { MessageType, type TTSMessage, type TTSResponse, type VoiceListResponse, type TTSGenerateChunkMessage } from '../lib/messages';
 import { TTSEngine, type VoiceId } from '../lib/tts-engine';
 import { setDownloadProgress, clearDownloadProgress, setCacheStatus } from '../lib/model-cache';
 import { getSelectedVoice } from '../lib/voice-storage';
+import { splitIntoChunks } from '../lib/text-chunker';
 
 console.log('Best TTS offscreen document loaded');
 
-// Current audio element for playback control
-let currentAudio: HTMLAudioElement | null = null;
-let currentAudioUrl: string | null = null;
+// Response type for chunk generation
+interface ChunkReadyResponse extends TTSResponse {
+  audioData?: string;       // base64-encoded audio data (NOT blob URL)
+  audioMimeType?: string;   // MIME type for recreating blob
+  chunkIndex?: number;
+  generationToken?: string;
+}
+
+// Response type for TTS_GENERATE (now returns chunks instead of playing)
+interface GenerateResponse extends TTSResponse {
+  chunks?: string[];
+}
 
 // Message handler
 chrome.runtime.onMessage.addListener((message: TTSMessage, sender, sendResponse) => {
@@ -32,13 +42,16 @@ chrome.runtime.onMessage.addListener((message: TTSMessage, sender, sendResponse)
 /**
  * Main message dispatcher
  */
-async function handleMessage(message: TTSMessage): Promise<TTSResponse | VoiceListResponse> {
+async function handleMessage(message: TTSMessage): Promise<TTSResponse | VoiceListResponse | ChunkReadyResponse | GenerateResponse> {
   switch (message.type) {
     case MessageType.TTS_INIT:
       return handleInit();
 
     case MessageType.TTS_GENERATE:
-      return handleGenerate(message.text, message.voice);
+      return handleGenerate(message.text, message.voice, (message as TTSMessage & { locale?: string }).locale);
+
+    case MessageType.TTS_GENERATE_CHUNK:
+      return handleGenerateChunk(message as TTSGenerateChunkMessage);
 
     case MessageType.TTS_STOP:
       return handleStop();
@@ -118,92 +131,86 @@ async function handleInit(): Promise<TTSResponse> {
 }
 
 /**
- * Generate speech and play it
+ * Split text into chunks and return them (no longer plays audio)
+ * Audio playback is handled by content scripts per CONTEXT.md
  */
-async function handleGenerate(text: string, voice: string): Promise<TTSResponse> {
+async function handleGenerate(text: string, voice: string, locale?: string): Promise<GenerateResponse> {
   try {
     // Validate input
     if (!text || text.trim().length === 0) {
       return { success: false, error: 'Text cannot be empty' };
     }
 
-    // Use provided voice or get from storage
-    const selectedVoice = (voice || await getSelectedVoice()) as VoiceId;
+    // Split into chunks
+    const chunks = splitIntoChunks(text, locale);
+    if (chunks.length === 0) {
+      return { success: false, error: 'No valid sentences found in text' };
+    }
 
-    console.log(`Generating speech for: "${text.substring(0, 50)}..." with voice: ${selectedVoice}`);
+    console.log(`Split text into ${chunks.length} chunks for voice: ${voice || 'default'}`);
 
-    // Generate audio
-    const blob = await TTSEngine.generate(text, selectedVoice);
-
-    // Stop any current playback
-    await stopCurrentPlayback();
-
-    // Create audio element and play
-    currentAudioUrl = URL.createObjectURL(blob);
-    currentAudio = new Audio(currentAudioUrl);
-
-    // Set up event handlers
-    currentAudio.onended = () => {
-      console.log('Playback completed');
-      cleanupAudio();
-
-      // Notify that playback is complete
-      chrome.runtime.sendMessage({
-        target: 'popup',
-        type: MessageType.GENERATION_COMPLETE
-      }).catch(() => {
-        // Popup might not be open
-      });
-    };
-
-    currentAudio.onerror = (e) => {
-      console.error('Audio playback error:', e);
-      cleanupAudio();
-    };
-
-    // Play the audio
-    await currentAudio.play();
-
-    console.log('Playback started');
-    return { success: true };
+    // Return chunks for service worker to orchestrate generation
+    return { success: true, chunks };
   } catch (error) {
-    console.error('TTS generation failed:', error);
-    cleanupAudio();
+    console.error('Text splitting failed:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to generate speech'
+      error: error instanceof Error ? error.message : 'Failed to process text'
     };
   }
 }
 
 /**
- * Stop current playback
+ * Generate audio for a single chunk and return as base64
+ * Returns base64-encoded audio data (not blob URL) because blob URLs are origin-bound.
+ * Content scripts cannot load blob URLs created in the offscreen document.
+ */
+async function handleGenerateChunk(msg: TTSGenerateChunkMessage): Promise<ChunkReadyResponse> {
+  const { text, voice, chunkIndex, totalChunks, generationToken } = msg;
+
+  try {
+    // Validate
+    if (!text || text.trim().length === 0) {
+      return { success: false, error: 'Chunk text cannot be empty' };
+    }
+
+    const selectedVoice = (voice || await getSelectedVoice()) as VoiceId;
+
+    console.log(`Generating chunk ${chunkIndex + 1}/${totalChunks}: "${text.substring(0, 30)}..."`);
+
+    // Generate audio blob
+    const blob = await TTSEngine.generate(text, selectedVoice);
+
+    // Convert blob to base64 for cross-origin transfer
+    // Blob URLs are origin-bound; content scripts cannot load offscreen blob URLs
+    const arrayBuffer = await blob.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+
+    return {
+      success: true,
+      audioData: base64,       // base64-encoded audio data
+      audioMimeType: blob.type, // e.g., 'audio/wav'
+      chunkIndex,
+      generationToken
+    };
+  } catch (error) {
+    console.error('Chunk generation failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate chunk'
+    };
+  }
+}
+
+/**
+ * Stop is now a no-op in offscreen (playback handled by content scripts)
+ * Kept for backward compatibility with existing message flow
  */
 async function handleStop(): Promise<TTSResponse> {
-  await stopCurrentPlayback();
+  // No audio playback in offscreen anymore - this is handled by content scripts
   return { success: true };
-}
-
-/**
- * Stop playback and cleanup resources
- */
-async function stopCurrentPlayback(): Promise<void> {
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.currentTime = 0;
-  }
-  cleanupAudio();
-}
-
-/**
- * Cleanup audio resources
- */
-function cleanupAudio(): void {
-  if (currentAudioUrl) {
-    URL.revokeObjectURL(currentAudioUrl);
-    currentAudioUrl = null;
-  }
-  currentAudio = null;
 }
 
 /**
@@ -231,11 +238,11 @@ async function handleListVoices(): Promise<VoiceListResponse> {
 
 /**
  * Get current status
+ * Note: isPlaying removed - playback state is managed by service worker
  */
-async function handleGetStatus(): Promise<TTSResponse & { initialized: boolean; isPlaying: boolean }> {
+async function handleGetStatus(): Promise<TTSResponse & { initialized: boolean }> {
   return {
     success: true,
-    initialized: TTSEngine.isInitialized(),
-    isPlaying: currentAudio !== null && !currentAudio.paused
+    initialized: TTSEngine.isInitialized()
   };
 }
