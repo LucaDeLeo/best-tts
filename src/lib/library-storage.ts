@@ -95,6 +95,21 @@ export async function deleteLibraryItem(id: string): Promise<void> {
 }
 
 /**
+ * Update library item metadata.
+ * For partial updates to metadata fields without touching content.
+ */
+export async function updateLibraryItem(
+  id: string,
+  updates: Partial<Omit<LibraryItem, 'id'>>
+): Promise<void> {
+  const db = await getLibraryDB();
+  const existing = await db.get('library-items', id);
+  if (!existing) throw new Error('Item not found');
+  const updated = { ...existing, ...updates };
+  await db.put('library-items', updated);
+}
+
+/**
  * Options for querying library items
  */
 export interface GetLibraryItemsOptions {

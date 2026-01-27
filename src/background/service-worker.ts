@@ -26,6 +26,12 @@ import {
   type AutosavePositionMessage,
   type GetLibraryItemMessage,
   type PlayLibraryItemMessage,
+  type FolderCreateMessage,
+  type FolderRenameMessage,
+  type FolderDeleteMessage,
+  type ItemMoveToFolderMessage,
+  type GetLibraryItemsMessage,
+  type DeleteLibraryItemMessage,
 } from '../lib/messages';
 import {
   saveLibraryItem,
@@ -34,6 +40,14 @@ import {
   getStorageEstimateForLibrary,
   getLibraryItemById,
   getLibraryContent,
+  createFolder,
+  renameFolder,
+  deleteFolder,
+  getFolders,
+  getLibraryItems,
+  updateLibraryItem,
+  deleteLibraryItem,
+  getLibraryDB,
 } from '../lib/library-storage';
 import type { LibraryItem, LibraryContent } from '../lib/library-types';
 import { savePositionNow, resumePosition } from '../lib/autosave';
@@ -109,6 +123,13 @@ type ServiceWorkerMessage = TTSMessage
   | AutosavePositionMessage
   | GetLibraryItemMessage
   | PlayLibraryItemMessage
+  | FolderCreateMessage
+  | FolderRenameMessage
+  | FolderDeleteMessage
+  | { type: 'folder-list'; target: 'service-worker' }
+  | ItemMoveToFolderMessage
+  | GetLibraryItemsMessage
+  | DeleteLibraryItemMessage
   | { type: 'get-pending-warning'; target: 'service-worker' }
   | { type: 'page-count-warning'; target: 'service-worker'; extractionId: string; pageCount: number; threshold: number };
 
@@ -560,6 +581,87 @@ async function handleServiceWorkerMessage(
           isSaved: !!existingItem,
           itemId: existingItem?.id
         });
+        break;
+      }
+
+      // Folder management handlers (Phase 7)
+      case MessageType.FOLDER_CREATE: {
+        const { name } = message as FolderCreateMessage;
+        if (!name || name.trim().length === 0) {
+          sendResponse({ success: false, error: 'Folder name required' });
+          break;
+        }
+        const folder = await createFolder(name.trim());
+        sendResponse({ success: true, folder });
+        break;
+      }
+
+      case MessageType.FOLDER_RENAME: {
+        const { folderId, name } = message as FolderRenameMessage;
+        if (!name || name.trim().length === 0) {
+          sendResponse({ success: false, error: 'Folder name required' });
+          break;
+        }
+        await renameFolder(folderId, name.trim());
+        sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.FOLDER_DELETE: {
+        const { folderId } = message as FolderDeleteMessage;
+        // Per CONTEXT.md: items in folder move to root (folderId = null)
+        // This is handled by deleteFolder which updates items first
+        await deleteFolder(folderId);
+        sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.FOLDER_LIST: {
+        const folders = await getFolders();
+        sendResponse({ success: true, folders });
+        break;
+      }
+
+      case MessageType.ITEM_MOVE_TO_FOLDER: {
+        const { itemId, folderId } = message as ItemMoveToFolderMessage;
+        const item = await getLibraryItemById(itemId);
+        if (!item) {
+          sendResponse({ success: false, error: 'Item not found' });
+          break;
+        }
+        await updateLibraryItem(itemId, { folderId });
+        sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.GET_LIBRARY_ITEMS: {
+        const { folderId } = message as GetLibraryItemsMessage;
+        const items = await getLibraryItems({ folderId });
+        sendResponse({ success: true, items });
+        break;
+      }
+
+      case MessageType.DELETE_LIBRARY_ITEM: {
+        const { itemId, deleteContent } = message as DeleteLibraryItemMessage;
+
+        if (deleteContent) {
+          // Delete content only, keep metadata
+          const item = await getLibraryItemById(itemId);
+          if (item) {
+            await updateLibraryItem(itemId, {
+              contentDeleted: true,
+              contentDeletedAt: Date.now()
+            });
+            // Delete from contents store
+            const db = await getLibraryDB();
+            await db.delete('library-contents', itemId);
+          }
+          sendResponse({ success: true });
+        } else {
+          // Delete completely
+          await deleteLibraryItem(itemId);
+          sendResponse({ success: true });
+        }
         break;
       }
 
