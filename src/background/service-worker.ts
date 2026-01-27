@@ -461,16 +461,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       return;
     }
 
-    // Successfully extracted - store text and metadata for later use by popup
-    await chrome.storage.session.set({
-      pendingExtraction: {
-        text: result.text,
-        title: result.title,
-        url: result.url,
-        source: result.source,
-        timestamp: Date.now()
-      }
-    });
+    // Successfully extracted - store using shared function
+    await storePendingExtraction(result);
 
     // Open popup to show the extracted text and let user play it
     // Note: Can't programmatically open popup, so show notification instead
@@ -497,6 +489,90 @@ function showNotification(title: string, message: string): void {
     iconUrl: 'icons/icon-48.png',
     title: `Best TTS: ${title}`,
     message
+  });
+}
+
+/**
+ * Handle popup port connections for extraction requests.
+ * Per CONTEXT.md:
+ * - Port keeps SW alive while popup is open
+ * - If popup closes mid-extraction, store result in session storage
+ */
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'extraction') return;
+
+  let pendingTabId: number | null = null;
+  let extractionInProgress = false;
+
+  port.onMessage.addListener(async (message) => {
+    if (message.type === MessageType.EXTRACT_ARTICLE || message.type === MessageType.EXTRACT_SELECTION) {
+      pendingTabId = message.tabId;
+      extractionInProgress = true;
+
+      try {
+        // Forward extraction request to content script
+        const result = await chrome.tabs.sendMessage(message.tabId, {
+          target: 'content-script',
+          type: message.type
+        }) as ExtractionResult;
+
+        extractionInProgress = false;
+
+        // Try to send result back over port
+        try {
+          port.postMessage({
+            type: 'EXTRACTION_RESPONSE',
+            result
+          });
+        } catch {
+          // Port disconnected (popup closed), store result
+          await storePendingExtraction(result);
+        }
+      } catch (error) {
+        extractionInProgress = false;
+        const errorResult: ExtractionResult = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Extraction failed',
+          source: message.type === MessageType.EXTRACT_ARTICLE ? 'article' : 'selection'
+        };
+
+        try {
+          port.postMessage({
+            type: 'EXTRACTION_RESPONSE',
+            result: errorResult
+          });
+        } catch {
+          // Port disconnected, nothing to store for failed extraction
+        }
+      }
+    }
+  });
+
+  // Handle popup close mid-extraction
+  port.onDisconnect.addListener(async () => {
+    if (extractionInProgress && pendingTabId !== null) {
+      // Extraction is still in progress but popup closed
+      // The extraction will complete and store result via the catch block above
+      console.log('Popup closed during extraction, result will be stored when ready');
+    }
+  });
+});
+
+/**
+ * Store extraction result in session storage for popup to retrieve later.
+ * Used when popup closes mid-extraction or for context menu extractions.
+ */
+async function storePendingExtraction(result: ExtractionResult) {
+  if (!result.success || !result.text) return;
+
+  await chrome.storage.session.set({
+    pendingExtraction: {
+      text: result.text,
+      title: result.title,
+      url: result.url,
+      source: result.source,
+      timestamp: Date.now()
+    }
   });
 }
 
