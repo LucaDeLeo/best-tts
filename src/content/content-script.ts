@@ -3,7 +3,8 @@ import {
   type PlayAudioMessage,
   type SetSpeedMessage,
   type ExtractionResult,
-  type InitHighlightingMessage
+  type InitHighlightingMessage,
+  type StatusUpdateMessage
 } from '../lib/messages';
 import { getSelectedText, extractArticle } from '../lib/content-extractor';
 import type { HighlightState } from '../lib/highlight-types';
@@ -77,6 +78,9 @@ async function handleMessage(message: any): Promise<any> {
 
     case MessageType.INIT_HIGHLIGHTING:
       return handleInitHighlighting(message as InitHighlightingMessage);
+
+    case MessageType.STATUS_UPDATE:
+      return handleStatusUpdate(message as StatusUpdateMessage);
 
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };
@@ -434,7 +438,77 @@ async function handleInitHighlighting(msg: InitHighlightingMessage): Promise<{
   }
 }
 
+/**
+ * Handle STATUS_UPDATE messages from service worker.
+ * Updates the floating player to reflect authoritative playback state.
+ * Per CONTEXT.md decision [13]: SW owns state, content script holds derived/cached copy.
+ */
+async function handleStatusUpdate(message: StatusUpdateMessage): Promise<{ success: boolean }> {
+  const status = message.status;
+
+  // Map service worker status to PlayerUIState
+  let playerStatus: 'idle' | 'generating' | 'playing' | 'paused';
+  if (status.isPlaying) {
+    playerStatus = 'playing';
+  } else if ((status as { isPaused?: boolean }).isPaused) {
+    playerStatus = 'paused';
+  } else if ((status as { isGenerating?: boolean }).isGenerating) {
+    playerStatus = 'generating';
+  } else {
+    playerStatus = 'idle';
+  }
+
+  // Update tracked state from service worker (authoritative source)
+  const statusExt = status as {
+    currentChunkIndex?: number;
+    totalChunks?: number;
+    playbackSpeed?: number;
+  };
+  currentChunkIndex = statusExt.currentChunkIndex ?? currentChunkIndex;
+  currentTotalChunks = statusExt.totalChunks ?? currentTotalChunks;
+  currentSpeed = statusExt.playbackSpeed ?? currentSpeed;
+
+  // Update floating player if exists
+  if (floatingPlayer) {
+    floatingPlayer.update({
+      status: playerStatus,
+      currentChunk: currentChunkIndex,
+      totalChunks: currentTotalChunks,
+      playbackSpeed: currentSpeed
+    });
+  }
+
+  return { success: true };
+}
+
 // Cleanup highlighting on page unload
 window.addEventListener('beforeunload', () => {
   cleanupHighlighting();
+});
+
+// Request current state from service worker to sync floating player on load
+// This ensures the player shows correct state after page navigation/refresh
+chrome.runtime.sendMessage({
+  target: 'service-worker',
+  type: MessageType.GET_STATUS
+}).then((response) => {
+  if (response && response.success) {
+    // Construct a StatusUpdateMessage-like object from the GET_STATUS response
+    handleStatusUpdate({
+      target: 'content-script',
+      type: MessageType.STATUS_UPDATE,
+      status: {
+        initialized: response.initialized,
+        currentVoice: response.currentVoice,
+        isPlaying: response.isPlaying,
+        isPaused: response.isPaused,
+        isGenerating: response.isGenerating,
+        currentChunkIndex: response.currentChunkIndex,
+        totalChunks: response.totalChunks,
+        playbackSpeed: response.playbackSpeed
+      }
+    } as StatusUpdateMessage);
+  }
+}).catch(() => {
+  // Service worker might not be ready - this is fine on initial load
 });
