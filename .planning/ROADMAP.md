@@ -1,0 +1,174 @@
+# Roadmap: Best TTS
+
+## Overview
+
+This roadmap delivers a privacy-focused Chrome extension for high-quality text-to-speech using the Kokoro TTS engine running entirely locally. The journey starts with establishing the TTS engine infrastructure (the hardest technical problem), then builds playback controls, content extraction, and text highlighting. Finally, it adds document support, a library system, and polished UI. Each phase delivers a verifiable capability that builds toward a Speechify-quality experience with full offline support.
+
+## Phases
+
+**Phase Numbering:**
+- Integer phases (1, 2, 3): Planned milestone work
+- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+
+Decimal phases appear between their surrounding integers in numeric order.
+
+- [ ] **Phase 1: TTS Engine** - Kokoro TTS running in browser via ONNX Runtime Web
+- [ ] **Phase 2: Basic Playback** - Play/pause, speed control, and keyboard shortcuts
+- [ ] **Phase 3: Content Extraction** - Read selected text and full webpages
+- [ ] **Phase 4: Text Highlighting** - Sync text display with audio playback
+- [ ] **Phase 5: Floating Player** - Mini player UI on any webpage
+- [ ] **Phase 6: Document Support** - Import and read PDFs and text files
+- [ ] **Phase 7: Library** - Save, organize, and resume documents
+- [ ] **Phase 8: Side Panel & Polish** - Full UI, settings, dark mode
+
+## Phase Details
+
+### Phase 1: TTS Engine
+**Goal**: User can generate speech from text using Kokoro TTS running entirely in the browser
+**Depends on**: Nothing (first phase)
+**Requirements**: TTS-01, TTS-02, TTS-03, TTS-04
+**Success Criteria** (what must be TRUE):
+  1. User can trigger TTS generation for a text string and hear audio output
+  2. User can select from at least 3 different Kokoro voices
+  3. User sees download progress when models are fetched on first use
+  4. TTS works without network connection after initial model download
+  5. Models persist in IndexedDB across browser sessions
+**Plans**: TBD
+
+Plans:
+- [ ] 01-01: TBD
+
+**Research Flag**: Needs research-phase (kokoro-js API, ONNX Runtime Web configuration, offscreen document patterns)
+
+### Phase 2: Basic Playback
+**Goal**: User has full control over audio playback with responsive controls
+**Depends on**: Phase 1
+**Requirements**: PLAY-01, PLAY-02, PLAY-03, PLAY-04, PLAY-05
+**Success Criteria** (what must be TRUE):
+  1. User can play, pause, and stop audio with immediate response
+  2. User can adjust speed from 0.5x to 4x with audible change
+  3. User can skip forward/back by sentence using buttons or keyboard
+  4. User sees progress indicator showing current position in content
+  5. Keyboard shortcuts work (space=play/pause, arrows=skip, +/-=speed)
+**Plans**: TBD
+
+Plans:
+- [ ] 02-01: TBD
+
+**Research Flag**: Standard Web Audio patterns, skip research-phase
+
+### Phase 3: Content Extraction
+**Goal**: User can read any webpage content aloud with intelligent text extraction
+**Depends on**: Phase 2
+**Requirements**: CONT-01, CONT-02
+**Success Criteria** (what must be TRUE):
+  1. User can select text on any webpage and play it aloud
+  2. Extension extracts article content from webpages (bypassing ads, navigation)
+  3. Reader mode extraction works on major news/blog sites
+  4. Extraction fails gracefully with user-friendly message on complex pages
+**Plans**: TBD
+
+Plans:
+- [ ] 03-01: TBD
+
+**Research Flag**: Standard Readability patterns, skip research-phase
+
+### Phase 4: Text Highlighting
+**Goal**: User sees text highlighted in sync with audio for easy reading
+**Depends on**: Phase 3
+**Requirements**: CONT-03, CONT-04
+**Success Criteria** (what must be TRUE):
+  1. Current word or sentence is visually highlighted during playback
+  2. Highlighting follows along at all playback speeds (0.5x to 4x)
+  3. Page scrolls automatically to keep highlighted text visible
+  4. Highlighting works on extracted article content
+**Plans**: TBD
+
+Plans:
+- [ ] 04-01: TBD
+
+**Research Flag**: Needs research-phase (audio-text synchronization, DOM position mapping)
+
+### Phase 5: Floating Player
+**Goal**: User has persistent playback controls accessible on any webpage
+**Depends on**: Phase 4
+**Requirements**: UI-01, UI-05
+**Success Criteria** (what must be TRUE):
+  1. Floating mini player appears when playback starts
+  2. Player UI is visually isolated from page styles (no CSS conflicts)
+  3. User can minimize/dismiss player when not needed
+  4. Player persists across page navigation within same tab
+**Plans**: TBD
+
+Plans:
+- [ ] 05-01: TBD
+
+**Research Flag**: Needs research-phase (Shadow DOM + Preact integration)
+
+### Phase 6: Document Support
+**Goal**: User can import and read PDF and text files
+**Depends on**: Phase 5
+**Requirements**: DOC-01, DOC-02, DOC-03
+**Success Criteria** (what must be TRUE):
+  1. User can open a PDF file and have it read aloud
+  2. Text extraction works on standard text-based PDFs
+  3. User can open plain text files (.txt, .md) for reading
+  4. Import UI is accessible from extension popup or side panel
+**Plans**: TBD
+
+Plans:
+- [ ] 06-01: TBD
+
+**Research Flag**: Needs research-phase (PDF.js integration, memory management)
+
+### Phase 7: Library
+**Goal**: User can save content and resume reading across sessions
+**Depends on**: Phase 6
+**Requirements**: LIB-01, LIB-02, LIB-03, LIB-04
+**Success Criteria** (what must be TRUE):
+  1. User can save any webpage or document to library for later
+  2. Reading position is remembered and resume works correctly
+  3. User can organize library items with folders or tags
+  4. All library data is stored locally (no cloud, works offline)
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01: TBD
+
+**Research Flag**: Standard CRUD patterns, skip research-phase
+
+### Phase 8: Side Panel & Polish
+**Goal**: User has polished, complete UI with full settings control
+**Depends on**: Phase 7
+**Requirements**: UI-02, UI-03, UI-04
+**Success Criteria** (what must be TRUE):
+  1. Side panel provides full library view and settings interface
+  2. Dark mode is available and setting persists
+  3. Settings page allows configuration of voice, speed, and shortcuts
+  4. Voice selection UI shows all available voices with preview option
+**Plans**: TBD
+
+Plans:
+- [ ] 08-01: TBD
+
+**Research Flag**: Standard settings UI patterns, skip research-phase
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. TTS Engine | 0/? | Not started | - |
+| 2. Basic Playback | 0/? | Not started | - |
+| 3. Content Extraction | 0/? | Not started | - |
+| 4. Text Highlighting | 0/? | Not started | - |
+| 5. Floating Player | 0/? | Not started | - |
+| 6. Document Support | 0/? | Not started | - |
+| 7. Library | 0/? | Not started | - |
+| 8. Side Panel & Polish | 0/? | Not started | - |
+
+---
+*Roadmap created: 2026-01-27*
+*Last updated: 2026-01-27*

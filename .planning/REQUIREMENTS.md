@@ -88,31 +88,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TTS-01 | Phase 1 | Pending |
-| TTS-02 | Phase 1 | Pending |
-| TTS-03 | Phase 1 | Pending |
-| TTS-04 | Phase 1 | Pending |
-| PLAY-01 | Phase 2 | Pending |
-| PLAY-02 | Phase 2 | Pending |
-| PLAY-03 | Phase 2 | Pending |
-| PLAY-04 | Phase 2 | Pending |
-| PLAY-05 | Phase 2 | Pending |
-| CONT-01 | Phase 3 | Pending |
-| CONT-02 | Phase 3 | Pending |
-| CONT-03 | Phase 4 | Pending |
-| CONT-04 | Phase 4 | Pending |
-| UI-01 | Phase 5 | Pending |
-| UI-02 | Phase 5 | Pending |
-| UI-05 | Phase 5 | Pending |
-| DOC-01 | Phase 6 | Pending |
-| DOC-02 | Phase 6 | Pending |
-| DOC-03 | Phase 6 | Pending |
-| LIB-01 | Phase 7 | Pending |
-| LIB-02 | Phase 7 | Pending |
-| LIB-03 | Phase 7 | Pending |
-| LIB-04 | Phase 7 | Pending |
-| UI-03 | Phase 8 | Pending |
-| UI-04 | Phase 8 | Pending |
+| TTS-01 | Phase 1: TTS Engine | Pending |
+| TTS-02 | Phase 1: TTS Engine | Pending |
+| TTS-03 | Phase 1: TTS Engine | Pending |
+| TTS-04 | Phase 1: TTS Engine | Pending |
+| PLAY-01 | Phase 2: Basic Playback | Pending |
+| PLAY-02 | Phase 2: Basic Playback | Pending |
+| PLAY-03 | Phase 2: Basic Playback | Pending |
+| PLAY-04 | Phase 2: Basic Playback | Pending |
+| PLAY-05 | Phase 2: Basic Playback | Pending |
+| CONT-01 | Phase 3: Content Extraction | Pending |
+| CONT-02 | Phase 3: Content Extraction | Pending |
+| CONT-03 | Phase 4: Text Highlighting | Pending |
+| CONT-04 | Phase 4: Text Highlighting | Pending |
+| UI-01 | Phase 5: Floating Player | Pending |
+| UI-05 | Phase 5: Floating Player | Pending |
+| DOC-01 | Phase 6: Document Support | Pending |
+| DOC-02 | Phase 6: Document Support | Pending |
+| DOC-03 | Phase 6: Document Support | Pending |
+| LIB-01 | Phase 7: Library | Pending |
+| LIB-02 | Phase 7: Library | Pending |
+| LIB-03 | Phase 7: Library | Pending |
+| LIB-04 | Phase 7: Library | Pending |
+| UI-02 | Phase 8: Side Panel & Polish | Pending |
+| UI-03 | Phase 8: Side Panel & Polish | Pending |
+| UI-04 | Phase 8: Side Panel & Polish | Pending |
 
 **Coverage:**
 - v1 requirements: 23 total
@@ -121,4 +121,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-27*
-*Last updated: 2026-01-27 after initial definition*
+*Last updated: 2026-01-27 after roadmap creation*
