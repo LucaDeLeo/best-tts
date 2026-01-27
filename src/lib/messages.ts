@@ -265,6 +265,26 @@ export interface LibraryStatusMessage extends BaseMessage {
   itemId?: string;  // If saved, the item's ID
 }
 
+export interface AutosavePositionMessage extends BaseMessage {
+  type: typeof MessageType.AUTOSAVE_POSITION;
+  itemId: string;
+  chunkIndex: number;
+  chunkText: string;
+  totalChunks: number;
+  contentLength: number;
+  contentHash: string;
+}
+
+export interface GetLibraryItemMessage extends BaseMessage {
+  type: typeof MessageType.GET_LIBRARY_ITEM;
+  itemId: string;
+}
+
+export interface PlayLibraryItemMessage extends BaseMessage {
+  type: typeof MessageType.PLAY_LIBRARY_ITEM;
+  itemId: string;
+}
+
 /**
  * Result returned from content extraction operations.
  * Used as sendResponse payload, not as a routable message.
@@ -305,7 +325,10 @@ export type TTSMessage =
   | ShowFloatingPlayerMessage
   | SaveToLibraryMessage
   | GetLibraryStatusMessage
-  | LibraryStatusMessage;
+  | LibraryStatusMessage
+  | AutosavePositionMessage
+  | GetLibraryItemMessage
+  | PlayLibraryItemMessage;
 
 // Response types
 export interface TTSResponse {
