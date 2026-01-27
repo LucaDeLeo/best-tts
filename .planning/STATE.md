@@ -156,6 +156,9 @@ Recent decisions affecting current work:
 - (08-03) Settings stored in consolidated 'settings' key in chrome.storage.local
 - (08-03) Migration runs once on service worker load, deletes legacy keys after migration
 - (08-03) ShortcutBindings interface for in-panel keyboard shortcuts (not global Chrome shortcuts)
+- (08-04) Shared library-list.ts component extracted to src/lib/ui/ per CONTEXT.md Decision #9
+- (08-04) Library state (folders, items, currentFolderId, selectedItemId) managed in side panel
+- (08-04) sendToServiceWorker helper for consistent message passing to service worker
 - (08-05) Voice dropdown shows Grade A voices first with "High Quality" indicator
 - (08-05) Theme toggle uses settings-storage module for persistence
 - (08-05) Shortcuts displayed read-only with link to chrome://extensions/shortcuts
