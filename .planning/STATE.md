@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 7 of 8 (Library Storage)
-Plan: 1 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 07-01-PLAN.md (Library Storage Foundation)
+Last activity: 2026-01-27 - Completed 07-03-PLAN.md (Autosave & Resume)
 
-Progress: [#############################] ~87% (28/~32 plans estimated)
+Progress: [##############################] ~94% (30/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 28
-- Average duration: 2.68 min
-- Total execution time: 75 min
+- Total plans completed: 30
+- Average duration: 2.83 min
+- Total execution time: 85 min
 
 **By Phase:**
 
@@ -33,10 +33,10 @@ Progress: [#############################] ~87% (28/~32 plans estimated)
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
 | 05-floating-player | 5 | 12 min | 2.4 min |
 | 06-document-support | 5 | 11 min | 2.2 min |
-| 07-library | 1 | 3 min | 3 min |
+| 07-library | 3 | 10 min | 3.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 4 min, 2 min, 3 min, 3 min, 3 min
+- Last 5 plans: 3 min, 3 min, 3 min, 3 min, 4 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -136,6 +136,9 @@ Recent decisions affecting current work:
 - (06-05) 5-minute timeout auto-cancels pending warnings
 - (06-05) WARNING_RESPONSE handles both page count and text length warnings
 - (07-01) by-folderId index type is string (not string|null) - root items filtered in JS
+- (07-03) Dynamic import for library-storage in savePositionNow avoids circular deps
+- (07-03) Resume fallback chain: exact -> charOffset -> snippet -> percentage -> beginning
+- (07-03) Autosave triggers: 10s interval during play, immediate on pause/stop/beforeunload
 
 ### Pending Todos
 
@@ -150,9 +153,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T11:17:08Z
-Stopped at: Completed 07-01-PLAN.md (Library Storage Foundation)
+Last session: 2026-01-27T11:25:14Z
+Stopped at: Completed 07-03-PLAN.md (Autosave & Resume)
 Resume file: None
 
 ---
-*Next action: Continue Phase 7 - 07-02-PLAN.md (Context Menu Save)*
+*Next action: Continue Phase 7 - 07-04-PLAN.md (Popup Library View)*
