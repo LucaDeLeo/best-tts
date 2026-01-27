@@ -328,7 +328,24 @@ textarea {
 }
 
 .btn-icon:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--bg-tertiary);
+}
+
+/* Icon button (side panel button) */
+.icon-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 14px;
+  transition: all var(--transition-fast);
+}
+
+.icon-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 /* File Import Section */
