@@ -9,6 +9,11 @@
  * - Focus-scoped keyboard handlers (no global listeners)
  */
 
+import { MessageType } from '../lib/messages';
+
+// Speed presets for cycling
+const SPEED_PRESETS = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
 // Component state interface
 export interface PlayerUIState {
   status: 'idle' | 'generating' | 'playing' | 'paused';
@@ -20,6 +25,28 @@ export interface PlayerUIState {
 // Singleton instance tracking
 let playerInstance: ReturnType<typeof createFloatingPlayer> | null = null;
 let hostElement: HTMLElement | null = null;
+
+// Current state for computing correct actions
+let currentState: PlayerUIState = {
+  status: 'idle',
+  currentChunk: 0,
+  totalChunks: 0,
+  playbackSpeed: 1.0
+};
+
+/**
+ * Send playback command to service worker.
+ * Silent catch since service worker might not be listening.
+ */
+function sendPlaybackCommand(type: string, payload?: Record<string, unknown>): void {
+  chrome.runtime.sendMessage({
+    target: 'service-worker',
+    type,
+    ...payload
+  }).catch(() => {
+    // Service worker might not be listening
+  });
+}
 
 /**
  * Get inline styles for the player component.
@@ -95,6 +122,14 @@ function getPlayerStyles(): string {
       min-width: 48px;
       text-align: center;
       font-variant-numeric: tabular-nums;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background-color 0.15s;
+    }
+
+    .speed-display:hover {
+      background: rgba(0, 0, 0, 0.1);
     }
 
     .hidden {
@@ -114,6 +149,10 @@ function getPlayerStyles(): string {
 
       .player-btn.dismiss:hover {
         background: #555;
+      }
+
+      .speed-display:hover {
+        background: rgba(255, 255, 255, 0.1);
       }
     }
   `;
@@ -234,7 +273,10 @@ export function createFloatingPlayer(): {
   // Create player DOM
   const {
     container,
+    prevBtn,
     playPauseBtn,
+    nextBtn,
+    stopBtn,
     speedDisplay,
     progressDisplay,
     dismissBtn
@@ -243,8 +285,11 @@ export function createFloatingPlayer(): {
   // Track visibility
   let isVisible = false;
 
-  // Update function - renders state to UI
+  // Update function - renders state to UI and updates currentState
   function update(state: PlayerUIState): void {
+    // Update cached state for button handlers
+    currentState = { ...state };
+
     // Show/hide based on status
     if (state.status === 'idle') {
       container.classList.add('hidden');
@@ -254,7 +299,7 @@ export function createFloatingPlayer(): {
       isVisible = true;
     }
 
-    // Update play/pause button
+    // Update play/pause button icon and label
     if (state.status === 'playing') {
       playPauseBtn.setAttribute('aria-label', 'Pause');
       playPauseBtn.textContent = '\u23F8'; // Pause symbol
@@ -263,28 +308,70 @@ export function createFloatingPlayer(): {
       playPauseBtn.textContent = '\u25B6'; // Play symbol
     }
 
-    // Update progress
-    progressDisplay.textContent = `${state.currentChunk + 1}/${state.totalChunks}`;
+    // Disable play/pause when idle or generating
+    playPauseBtn.disabled = state.status === 'idle' || state.status === 'generating';
 
-    // Update speed display
-    speedDisplay.textContent = `${state.playbackSpeed.toFixed(1)}x`;
+    // Disable prev when at first chunk
+    prevBtn.disabled = state.currentChunk === 0;
+
+    // Disable next when at last chunk
+    nextBtn.disabled = state.currentChunk >= state.totalChunks - 1;
+
+    // Update progress display ("X / Y" format)
+    progressDisplay.textContent = `${state.currentChunk + 1} / ${state.totalChunks}`;
+
+    // Update speed display ("X.Xx" format)
+    speedDisplay.textContent = `${state.playbackSpeed.toFixed(2)}x`;
   }
+
+  // Play/Pause button handler
+  playPauseBtn.onclick = () => {
+    if (currentState.status === 'playing') {
+      sendPlaybackCommand(MessageType.PAUSE_AUDIO);
+    } else if (currentState.status === 'paused') {
+      sendPlaybackCommand(MessageType.RESUME_AUDIO);
+    }
+    // Don't handle idle/generating - button should be disabled
+  };
+
+  // Stop button handler
+  stopBtn.onclick = () => {
+    sendPlaybackCommand(MessageType.STOP_PLAYBACK);
+  };
+
+  // Skip previous button handler
+  prevBtn.onclick = () => {
+    const targetIndex = Math.max(0, currentState.currentChunk - 1);
+    if (targetIndex !== currentState.currentChunk) {
+      sendPlaybackCommand(MessageType.SKIP_TO_CHUNK, { chunkIndex: targetIndex });
+    }
+  };
+
+  // Skip next button handler
+  nextBtn.onclick = () => {
+    const targetIndex = Math.min(currentState.totalChunks - 1, currentState.currentChunk + 1);
+    if (targetIndex !== currentState.currentChunk) {
+      sendPlaybackCommand(MessageType.SKIP_TO_CHUNK, { chunkIndex: targetIndex });
+    }
+  };
+
+  // Speed control handler - cycles through presets
+  speedDisplay.style.cursor = 'pointer';
+  speedDisplay.onclick = () => {
+    const currentIdx = SPEED_PRESETS.findIndex(s => Math.abs(s - currentState.playbackSpeed) < 0.01);
+    const nextIdx = (currentIdx + 1) % SPEED_PRESETS.length;
+    const nextSpeed = SPEED_PRESETS[nextIdx];
+    sendPlaybackCommand(MessageType.SET_SPEED, { speed: nextSpeed });
+  };
 
   // Dismiss handler
   dismissBtn.onclick = () => {
+    sendPlaybackCommand(MessageType.STOP_PLAYBACK);
     container.classList.add('hidden');
     isVisible = false;
     // Dispatch event for cleanup coordination
     window.dispatchEvent(new CustomEvent('besttts-player-dismissed'));
   };
-
-  // Focus-scoped keyboard handler (per CONTEXT.md decision [12])
-  container.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      dismissBtn.click();
-    }
-  });
 
   // Add host to document
   document.body.appendChild(host);
