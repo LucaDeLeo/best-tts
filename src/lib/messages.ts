@@ -88,12 +88,20 @@ export const MessageType = {
   EXTRACTION_PROGRESS: 'extraction-progress',
   EXTRACTION_COMPLETE: 'extraction-complete',
   PAGE_COUNT_WARNING: 'page-count-warning',
+
+  // Library (Phase 7)
+  SAVE_TO_LIBRARY: 'save-to-library',           // Save content to library
+  GET_LIBRARY_STATUS: 'get-library-status',     // Check if URL is saved
+  LIBRARY_STATUS: 'library-status',             // Response with saved status
+  AUTOSAVE_POSITION: 'autosave-position',       // Save current reading position
+  GET_LIBRARY_ITEM: 'get-library-item',         // Get item for resume
+  PLAY_LIBRARY_ITEM: 'play-library-item',       // Play from library with resume
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
 
 // Base message structure
-interface BaseMessage {
+export interface BaseMessage {
   target: MessageTarget;
   type: MessageTypeValue;
 }
@@ -234,6 +242,29 @@ export interface ShowFloatingPlayerMessage extends BaseMessage {
   type: typeof MessageType.SHOW_FLOATING_PLAYER;
 }
 
+// Library messages (Phase 7)
+export interface SaveToLibraryMessage extends BaseMessage {
+  type: typeof MessageType.SAVE_TO_LIBRARY;
+  item: {
+    title: string;
+    url: string;
+    source: 'webpage' | 'pdf' | 'text';
+    content: string;
+    folderId?: string | null;
+  };
+}
+
+export interface GetLibraryStatusMessage extends BaseMessage {
+  type: typeof MessageType.GET_LIBRARY_STATUS;
+  url: string;
+}
+
+export interface LibraryStatusMessage extends BaseMessage {
+  type: typeof MessageType.LIBRARY_STATUS;
+  isSaved: boolean;
+  itemId?: string;  // If saved, the item's ID
+}
+
 /**
  * Result returned from content extraction operations.
  * Used as sendResponse payload, not as a routable message.
@@ -271,7 +302,10 @@ export type TTSMessage =
   | ExtractSelectionMessage
   | ExtractArticleMessage
   | InitHighlightingMessage
-  | ShowFloatingPlayerMessage;
+  | ShowFloatingPlayerMessage
+  | SaveToLibraryMessage
+  | GetLibraryStatusMessage
+  | LibraryStatusMessage;
 
 // Response types
 export interface TTSResponse {
@@ -291,6 +325,11 @@ export interface StatusResponse extends TTSResponse {
   initialized: boolean;
   currentVoice?: string;
   isPlaying?: boolean;
+}
+
+export interface SaveToLibraryResponse extends TTSResponse {
+  itemId?: string;
+  alreadyExists?: boolean;
 }
 
 // Helper to create messages
