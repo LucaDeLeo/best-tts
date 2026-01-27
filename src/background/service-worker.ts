@@ -82,12 +82,22 @@ async function handleServiceWorkerMessage(
   try {
     switch (message.type) {
       case MessageType.GET_STATUS: {
-        // Return full playback state
+        // Return full playback state with explicit boolean fields for UI sync
         const state = getPlaybackState();
         sendResponse({
           success: true,
-          ...state
-        } as TTSResponse & typeof state);
+          // Include raw state first, then override with computed fields
+          ...state,
+          initialized: true,
+          isPlaying: state.status === 'playing',
+          isGenerating: state.status === 'generating',
+          isPaused: state.status === 'paused'
+        } as TTSResponse & typeof state & {
+          initialized: boolean;
+          isPlaying: boolean;
+          isGenerating: boolean;
+          isPaused: boolean;
+        });
         break;
       }
 
@@ -368,24 +378,42 @@ async function routeToOffscreen(
 }
 
 /**
- * Broadcast status update to popup
+ * Broadcast status update to popup and active tab's content script.
+ * Per CONTEXT.md decision [13]: SW owns authoritative state; content script holds derived copy.
+ * This ensures both popup and floating player stay in sync.
  */
 function broadcastStatusUpdate(): void {
   const state = getPlaybackState();
+  const statusPayload = {
+    initialized: true,
+    currentVoice: undefined,
+    isPlaying: state.status === 'playing',
+    isGenerating: state.status === 'generating',
+    isPaused: state.status === 'paused',
+    currentChunkIndex: state.currentChunkIndex,
+    totalChunks: state.totalChunks,
+    playbackSpeed: state.playbackSpeed
+  };
+
+  // Broadcast to popup
   chrome.runtime.sendMessage({
     target: 'popup',
     type: MessageType.STATUS_UPDATE,
-    status: {
-      initialized: true,
-      currentVoice: undefined,
-      isPlaying: state.status === 'playing',
-      isGenerating: state.status === 'generating',
-      isPaused: state.status === 'paused',
-      currentChunkIndex: state.currentChunkIndex,
-      totalChunks: state.totalChunks,
-      playbackSpeed: state.playbackSpeed
-    }
-  }).catch(() => {});
+    status: statusPayload
+  }).catch(() => {
+    // Popup might not be open
+  });
+
+  // Broadcast to active tab's content script (for floating player)
+  if (state.activeTabId) {
+    chrome.tabs.sendMessage(state.activeTabId, {
+      target: 'content-script',
+      type: MessageType.STATUS_UPDATE,
+      status: statusPayload
+    }).catch(() => {
+      // Content script might not be injected
+    });
+  }
 }
 
 /**
