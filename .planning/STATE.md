@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 3 of 8 (Content Extraction)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 03-01-PLAN.md (Content Extraction Foundation)
+Last activity: 2026-01-27 - Completed 03-02-PLAN.md (Context Menu Integration)
 
-Progress: [#########-] ~28% (9/~32 plans estimated)
+Progress: [##########] ~31% (10/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
-- Average duration: 3.3 min
-- Total execution time: 30 min
+- Total plans completed: 10
+- Average duration: 3.2 min
+- Total execution time: 32 min
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [#########-] ~28% (9/~32 plans estimated)
 |-------|-------|-------|----------|
 | 01-tts-engine | 4 | 16 min | 4 min |
 | 02-basic-playback | 4 | 12 min | 3 min |
-| 03-content-extraction | 1 | 2 min | 2 min |
+| 03-content-extraction | 2 | 4 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 2 min, 3 min, 5 min, 2 min
+- Last 5 plans: 2 min, 2 min, 2 min, 3 min, 5 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -71,6 +71,9 @@ Recent decisions affecting current work:
 - (03-01) Used @mozilla/readability (not @plumalab/readability which doesn't exist)
 - (03-01) MutationObserver for SPA stabilization: 300ms inactivity, 3s max wait
 - (03-01) MIN_CONTENT_LENGTH=100 chars for valid article extraction
+- (03-02) Store extraction results in chrome.storage.session.pendingExtraction
+- (03-02) Show notification after extraction since popup cannot be opened programmatically
+- (03-02) Use 48x48 blue circle as placeholder icon for notifications and toolbar
 
 ### Pending Todos
 
@@ -85,9 +88,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T06:41:14Z
-Stopped at: Completed 03-01-PLAN.md (Content Extraction Foundation)
+Last session: 2026-01-27T06:46:47Z
+Stopped at: Completed 03-02-PLAN.md (Context Menu Integration)
 Resume file: None
 
 ---
-*Next action: Continue Phase 3 with 03-02 (Context Menu Integration)*
+*Next action: Continue Phase 3 with 03-03 (Content Script Message Handlers)*
