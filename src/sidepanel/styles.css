@@ -1,5 +1,8 @@
 /* Side Panel Base Styles */
 
+/* Import shared styles */
+@import '../lib/styles/shared.css';
+
 /* Reset */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -319,4 +322,199 @@ body {
 /* Utility Classes */
 .hidden {
   display: none !important;
+}
+
+/* Library Layout */
+.library-layout {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 120px); /* Account for header and tabs */
+}
+
+.library-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.library-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Folders list */
+.folders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 8px;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: all 0.15s ease;
+}
+
+.folder-item:hover {
+  background: var(--bg-tertiary, #e5e5e5);
+}
+
+.folder-item.active {
+  background: var(--accent-color);
+  color: #ffffff;
+}
+
+.folder-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.folder-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-actions-inline {
+  display: none;
+  gap: 4px;
+}
+
+.folder-item:hover .folder-actions-inline,
+.folder-item.active .folder-actions-inline {
+  display: flex;
+}
+
+.folder-action-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+  opacity: 0.7;
+  color: inherit;
+  border-radius: 2px;
+}
+
+.folder-action-btn:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.folder-item.active .folder-action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* New folder input row */
+.new-folder-row {
+  display: flex;
+  gap: 8px;
+}
+
+.folder-input {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.folder-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* Items list */
+.items-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+.library-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.library-item .item-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.library-item .progress-badge {
+  font-size: 11px;
+  color: var(--accent-color);
+  background: var(--accent-light, rgba(59, 130, 246, 0.1));
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.library-item.content-deleted {
+  opacity: 0.6;
+}
+
+/* Item actions bar */
+.item-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.item-actions-bar label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.item-actions-bar .folder-select {
+  width: auto;
+  min-width: 150px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.item-actions-bar .folder-select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* Button overrides for library */
+.btn-primary {
+  background-color: var(--accent-color);
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
 }
