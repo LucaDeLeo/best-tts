@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 2 - Basic Playback
+**Current focus:** Phase 2 - Basic Playback (COMPLETE)
 
 ## Current Position
 
-Phase: 2 of 8 (Basic Playback)
-Plan: 3 of 4 in current phase
-Status: In progress
-Last activity: 2026-01-27 - Completed 02-03-PLAN.md (Content Script Audio Player)
+Phase: 2 of 8 (Basic Playback) - COMPLETE
+Plan: 4 of 4 in current phase
+Status: Phase complete
+Last activity: 2026-01-27 - Completed 02-04-PLAN.md (Popup Playback Controls)
 
-Progress: [#######---] ~22% (7/~32 plans estimated)
+Progress: [########--] ~25% (8/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 3 min
-- Total execution time: 23 min
+- Total plans completed: 8
+- Average duration: 3.5 min
+- Total execution time: 28 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-tts-engine | 4 | 16 min | 4 min |
-| 02-basic-playback | 3 | 7 min | 2 min |
+| 02-basic-playback | 4 | 12 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 5 min, 4 min, 2 min, 2 min, 3 min
+- Last 5 plans: 4 min, 2 min, 2 min, 3 min, 5 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -64,6 +64,9 @@ Recent decisions affecting current work:
 - (02-03) Audio plays in content script to inherit page's Media Engagement Index
 - (02-03) 2-second heartbeat interval for liveness detection
 - (02-03) User-friendly autoplay error message guides recovery
+- (02-04) Route TTS_GENERATE to service worker for proper playback orchestration
+- (02-04) Focus guard pattern: keyboard shortcuts disabled when textarea focused
+- (02-04) STATUS_UPDATE/AUDIO_ERROR message handling for UI synchronization
 
 ### Pending Todos
 
@@ -78,9 +81,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T05:49:03Z
-Stopped at: Completed 02-03-PLAN.md (Content Script Audio Player)
+Last session: 2026-01-27T05:56:38Z
+Stopped at: Completed 02-04-PLAN.md (Popup Playback Controls) - Phase 2 complete
 Resume file: None
 
 ---
-*Next action: Execute 02-04-PLAN.md (Popup Playback Controls)*
+*Next action: Begin Phase 3 (Text Selection)*
