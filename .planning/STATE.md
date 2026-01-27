@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 3 - Content Extraction (In Progress)
+**Current focus:** Phase 3 - Content Extraction (Complete)
 
 ## Current Position
 
 Phase: 3 of 8 (Content Extraction)
-Plan: 3 of 4 in current phase
-Status: In progress
-Last activity: 2026-01-27 - Completed 03-03-PLAN.md (Content Script Message Handlers)
+Plan: 4 of 4 in current phase
+Status: Phase complete
+Last activity: 2026-01-27 - Completed 03-04-PLAN.md (Popup Extraction UI)
 
-Progress: [###########] ~34% (11/~32 plans estimated)
+Progress: [############] ~38% (12/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 12
 - Average duration: 3.1 min
-- Total execution time: 34 min
+- Total execution time: 37 min
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [###########] ~34% (11/~32 plans estimated)
 |-------|-------|-------|----------|
 | 01-tts-engine | 4 | 16 min | 4 min |
 | 02-basic-playback | 4 | 12 min | 3 min |
-| 03-content-extraction | 3 | 6 min | 2 min |
+| 03-content-extraction | 4 | 9 min | 2.25 min |
 
 **Recent Trend:**
 - Last 5 plans: 2 min, 2 min, 2 min, 2 min, 3 min
@@ -76,6 +76,10 @@ Recent decisions affecting current work:
 - (03-02) Use 48x48 blue circle as placeholder icon for notifications and toolbar
 - (03-03) 10s extraction timeout prevents content script from hanging under MV3 30s limit
 - (03-03) ExtractionResult includes source field ('selection' | 'article') for context
+- (03-04) chrome.runtime.connect() port keeps SW alive during extraction
+- (03-04) 15s popup timeout (content script has 10s internal timeout)
+- (03-04) 5-minute expiry for pending extractions in session storage
+- (03-04) storePendingExtraction() shared between popup-close fallback and context menu
 
 ### Pending Todos
 
@@ -90,9 +94,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T06:49:00Z
-Stopped at: Completed 03-03-PLAN.md (Content Script Message Handlers)
+Last session: 2026-01-27T06:53:00Z
+Stopped at: Completed 03-04-PLAN.md (Popup Extraction UI) - Phase 3 complete
 Resume file: None
 
 ---
-*Next action: Continue Phase 3 with 03-04 (Popup Extraction UI)*
+*Next action: Begin Phase 4 (Voice Customization)*
