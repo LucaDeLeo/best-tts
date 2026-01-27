@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Basic Playback** - Play/pause, speed control, and keyboard shortcuts
 - [x] **Phase 3: Content Extraction** - Read selected text and full webpages
 - [x] **Phase 4: Text Highlighting** - Sync text display with audio playback
-- [ ] **Phase 5: Floating Player** - Mini player UI on any webpage
+- [x] **Phase 5: Floating Player** - Mini player UI on any webpage
 - [ ] **Phase 6: Document Support** - Import and read PDFs and text files
 - [ ] **Phase 7: Library** - Save, organize, and resume documents
 - [ ] **Phase 8: Side Panel & Polish** - Full UI, settings, dark mode
@@ -122,14 +122,15 @@ Plans:
 **Plans**: 5 plans in 3 waves
 
 Plans:
-- [ ] 05-01-PLAN.md — Shadow DOM component with styles and basic structure
-- [ ] 05-02-PLAN.md — Control buttons and keyboard shortcuts
-- [ ] 05-03-PLAN.md — STATUS_UPDATE subscription and state sync
-- [ ] 05-04-PLAN.md — Dismiss/minimize behavior and visibility control
-- [ ] 05-05-PLAN.md — Navigation persistence and state rehydration
+- [x] 05-01-PLAN.md — Shadow DOM component with styles and basic structure
+- [x] 05-02-PLAN.md — Control buttons and keyboard shortcuts
+- [x] 05-03-PLAN.md — STATUS_UPDATE subscription and state sync
+- [x] 05-04-PLAN.md — Dismiss/minimize behavior and visibility control
+- [x] 05-05-PLAN.md — Navigation persistence and state rehydration
 
 **Research**: Completed (05-RESEARCH.md)
 **Context**: Completed (CONTEXT.md)
+**Completed**: 2026-01-27
 
 ### Phase 6: Document Support
 **Goal**: User can import and read PDF and text files
@@ -190,11 +191,11 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 2. Basic Playback | 4/4 | ✓ Complete | 2026-01-27 |
 | 3. Content Extraction | 4/4 | ✓ Complete | 2026-01-27 |
 | 4. Text Highlighting | 5/5 | ✓ Complete | 2026-01-27 |
-| 5. Floating Player | 0/5 | Planned | - |
+| 5. Floating Player | 5/5 | ✓ Complete | 2026-01-27 |
 | 6. Document Support | 0/? | Not started | - |
 | 7. Library | 0/? | Not started | - |
 | 8. Side Panel & Polish | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27 — Phase 5 planned*
+*Last updated: 2026-01-27 — Phase 5 complete*
