@@ -4,18 +4,69 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Best TTS</title>
-  <style>
-    body {
-      width: 320px;
-      padding: 16px;
-      font-family: system-ui, sans-serif;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h1>Best TTS</h1>
-  <p>Extension loaded successfully.</p>
-  <p id="status">Initializing...</p>
+  <div class="container">
+    <header>
+      <h1>Best TTS</h1>
+      <span id="status-indicator" class="status-indicator"></span>
+    </header>
+
+    <!-- Download Progress (shown during model download) -->
+    <div id="progress-section" class="progress-section hidden">
+      <div class="progress-label">
+        <span>Downloading model...</span>
+        <span id="progress-percent">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <p id="progress-file" class="progress-file"></p>
+    </div>
+
+    <!-- Main Controls (shown when ready) -->
+    <div id="main-section" class="main-section">
+      <!-- Text Input -->
+      <div class="input-group">
+        <label for="text-input">Text to speak</label>
+        <textarea
+          id="text-input"
+          placeholder="Enter text to convert to speech..."
+          rows="4"
+        ></textarea>
+      </div>
+
+      <!-- Voice Selection -->
+      <div class="input-group">
+        <label for="voice-select">Voice</label>
+        <select id="voice-select">
+          <option value="">Loading voices...</option>
+        </select>
+      </div>
+
+      <!-- Playback Controls -->
+      <div class="controls">
+        <button id="play-btn" class="btn btn-primary" disabled>
+          <span class="btn-text">Speak</span>
+          <span class="btn-loading hidden">Generating...</span>
+        </button>
+        <button id="stop-btn" class="btn btn-secondary" disabled>
+          Stop
+        </button>
+      </div>
+
+      <!-- Status Messages -->
+      <p id="message" class="message"></p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-section" class="error-section hidden">
+      <p id="error-message" class="error-message"></p>
+      <button id="retry-btn" class="btn btn-secondary">Retry</button>
+    </div>
+  </div>
+
   <script type="module" src="popup.ts"></script>
 </body>
 </html>

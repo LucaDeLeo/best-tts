@@ -1,0 +1,241 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1a1a1a;
+  background: #ffffff;
+}
+
+.container {
+  width: 340px;
+  padding: 16px;
+}
+
+/* Header */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+h1 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e5e5e5;
+}
+
+.status-indicator.ready {
+  background: #22c55e;
+}
+
+.status-indicator.loading {
+  background: #f59e0b;
+  animation: pulse 1.5s infinite;
+}
+
+.status-indicator.error {
+  background: #ef4444;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Progress Section */
+.progress-section {
+  margin-bottom: 16px;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #525252;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #e5e5e5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.progress-file {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #737373;
+  word-break: break-all;
+}
+
+/* Main Section */
+.main-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #525252;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 80px;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+textarea::placeholder {
+  color: #a3a3a3;
+}
+
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-primary:active:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btn-secondary {
+  background: #f5f5f5;
+  color: #525252;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e5e5e5;
+}
+
+.btn-secondary:active:not(:disabled) {
+  background: #d4d4d4;
+}
+
+.btn-loading {
+  display: none;
+}
+
+.btn.loading .btn-text {
+  display: none;
+}
+
+.btn.loading .btn-loading {
+  display: inline;
+}
+
+/* Messages */
+.message {
+  font-size: 13px;
+  color: #525252;
+  text-align: center;
+}
+
+.message.error {
+  color: #ef4444;
+}
+
+.message.success {
+  color: #22c55e;
+}
+
+/* Error Section */
+.error-section {
+  text-align: center;
+}
+
+.error-message {
+  margin-bottom: 12px;
+  color: #ef4444;
+  font-size: 13px;
+}
+
+/* Utility */
+.hidden {
+  display: none !important;
+}
