@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 6 - Document Support (Complete)
+**Current focus:** Phase 7 - Library Storage
 
 ## Current Position
 
-Phase: 6 of 8 (Document Support)
-Plan: 5 of 5 in current phase (COMPLETE)
-Status: Phase complete
-Last activity: 2026-01-27 - Completed 06-05-PLAN.md (Service Worker & Warnings)
+Phase: 7 of 8 (Library Storage)
+Plan: 1 of 5 in current phase
+Status: In progress
+Last activity: 2026-01-27 - Completed 07-01-PLAN.md (Library Storage Foundation)
 
-Progress: [############################] ~84% (27/~32 plans estimated)
+Progress: [#############################] ~87% (28/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27
-- Average duration: 2.67 min
-- Total execution time: 72 min
+- Total plans completed: 28
+- Average duration: 2.68 min
+- Total execution time: 75 min
 
 **By Phase:**
 
@@ -33,9 +33,10 @@ Progress: [############################] ~84% (27/~32 plans estimated)
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
 | 05-floating-player | 5 | 12 min | 2.4 min |
 | 06-document-support | 5 | 11 min | 2.2 min |
+| 07-library | 1 | 3 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 3 min, 4 min, 2 min, 3 min, 3 min
+- Last 5 plans: 4 min, 2 min, 3 min, 3 min, 3 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -134,6 +135,7 @@ Recent decisions affecting current work:
 - (06-05) Promise resolver pattern for early page count warnings
 - (06-05) 5-minute timeout auto-cancels pending warnings
 - (06-05) WARNING_RESPONSE handles both page count and text length warnings
+- (07-01) by-folderId index type is string (not string|null) - root items filtered in JS
 
 ### Pending Todos
 
@@ -148,9 +150,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T10:25:00Z
-Stopped at: Completed 06-05-PLAN.md (Service Worker & Warnings)
+Last session: 2026-01-27T11:17:08Z
+Stopped at: Completed 07-01-PLAN.md (Library Storage Foundation)
 Resume file: None
 
 ---
-*Next action: Begin Phase 7 - Library Storage*
+*Next action: Continue Phase 7 - 07-02-PLAN.md (Context Menu Save)*
