@@ -1,3 +1,28 @@
+// Re-export document extraction types
+export type {
+  DocumentType,
+  ExtractDocumentMessage,
+  DocumentChunkMessage,
+  DocumentChunkCompleteMessage,
+  OffscreenExtractMessage,
+  DocumentExtractionResult,
+  ExtractionWarningMessage,
+  WarningResponseMessage,
+  CancelExtractionMessage,
+  GetPendingWarningMessage,
+  ExtractionProgressMessage,
+  ExtractionState,
+  PendingWarning,
+  WarningType,
+} from './document-types';
+
+export {
+  EXTRACTION_THRESHOLDS,
+  generateExtractionId,
+  needsChunkedUpload,
+  calculateChunkCount,
+} from './document-types';
+
 // Message targets
 export type MessageTarget = 'offscreen' | 'service-worker' | 'popup' | 'content-script';
 
@@ -47,6 +72,22 @@ export const MessageType = {
 
   // Floating player control
   SHOW_FLOATING_PLAYER: 'show-floating-player', // Restore dismissed floating player
+
+  // Document extraction (Phase 6)
+  EXTRACT_DOCUMENT: 'extract-document',
+  DOCUMENT_CHUNK: 'document-chunk',
+  DOCUMENT_CHUNK_COMPLETE: 'document-chunk-complete',
+  INIT_CHUNK_STORAGE: 'init-chunk-storage',
+  STORE_CHUNK: 'store-chunk',
+  EXTRACT_FROM_CHUNKS: 'extract-from-chunks',
+  CLEANUP_CHUNKS: 'cleanup-chunks',
+  EXTRACTION_WARNING: 'extraction-warning',
+  WARNING_RESPONSE: 'warning-response',
+  CANCEL_EXTRACTION: 'cancel-extraction',
+  GET_PENDING_WARNING: 'get-pending-warning',
+  EXTRACTION_PROGRESS: 'extraction-progress',
+  EXTRACTION_COMPLETE: 'extraction-complete',
+  PAGE_COUNT_WARNING: 'page-count-warning',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
