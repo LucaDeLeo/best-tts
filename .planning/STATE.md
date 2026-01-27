@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 3 of 8 (Content Extraction)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 03-02-PLAN.md (Context Menu Integration)
+Last activity: 2026-01-27 - Completed 03-03-PLAN.md (Content Script Message Handlers)
 
-Progress: [##########] ~31% (10/~32 plans estimated)
+Progress: [###########] ~34% (11/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 3.2 min
-- Total execution time: 32 min
+- Total plans completed: 11
+- Average duration: 3.1 min
+- Total execution time: 34 min
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [##########] ~31% (10/~32 plans estimated)
 |-------|-------|-------|----------|
 | 01-tts-engine | 4 | 16 min | 4 min |
 | 02-basic-playback | 4 | 12 min | 3 min |
-| 03-content-extraction | 2 | 4 min | 2 min |
+| 03-content-extraction | 3 | 6 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 2 min, 2 min, 3 min, 5 min
+- Last 5 plans: 2 min, 2 min, 2 min, 2 min, 3 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -74,6 +74,8 @@ Recent decisions affecting current work:
 - (03-02) Store extraction results in chrome.storage.session.pendingExtraction
 - (03-02) Show notification after extraction since popup cannot be opened programmatically
 - (03-02) Use 48x48 blue circle as placeholder icon for notifications and toolbar
+- (03-03) 10s extraction timeout prevents content script from hanging under MV3 30s limit
+- (03-03) ExtractionResult includes source field ('selection' | 'article') for context
 
 ### Pending Todos
 
@@ -88,9 +90,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T06:46:47Z
-Stopped at: Completed 03-02-PLAN.md (Context Menu Integration)
+Last session: 2026-01-27T06:49:00Z
+Stopped at: Completed 03-03-PLAN.md (Content Script Message Handlers)
 Resume file: None
 
 ---
-*Next action: Continue Phase 3 with 03-03 (Content Script Message Handlers)*
+*Next action: Continue Phase 3 with 03-04 (Popup Extraction UI)*
