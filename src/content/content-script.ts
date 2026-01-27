@@ -247,6 +247,9 @@ async function handleStop(): Promise<{ success: boolean }> {
   currentChunkIndex = 0;
   currentTotalChunks = 0;
 
+  // Reset dismissed state so player shows on next playback
+  playerDismissed = false;
+
   return { success: true };
 }
 
@@ -472,7 +475,8 @@ async function handleStatusUpdate(message: StatusUpdateMessage): Promise<{ succe
     playerStatus = 'idle';
   }
 
-  // Update tracked state from service worker (authoritative source)
+  // Always track the latest state (even when dismissed)
+  // This ensures state is fresh when player is restored
   const statusExt = status as {
     currentChunkIndex?: number;
     totalChunks?: number;
@@ -482,14 +486,23 @@ async function handleStatusUpdate(message: StatusUpdateMessage): Promise<{ succe
   currentTotalChunks = statusExt.totalChunks ?? currentTotalChunks;
   currentSpeed = statusExt.playbackSpeed ?? currentSpeed;
 
-  // Update floating player if exists
+  // Reset dismissed state when going idle (so player shows on next playback)
+  if (playerStatus === 'idle') {
+    playerDismissed = false;
+  }
+
+  // Update floating player UI if exists
   if (floatingPlayer) {
-    floatingPlayer.update({
-      status: playerStatus,
-      currentChunk: currentChunkIndex,
-      totalChunks: currentTotalChunks,
-      playbackSpeed: currentSpeed
-    });
+    // Only update UI if not dismissed, or if going idle (to hide)
+    // Note: Internal state (currentChunkIndex, etc.) is always updated above
+    if (!playerDismissed || playerStatus === 'idle') {
+      floatingPlayer.update({
+        status: playerStatus,
+        currentChunk: currentChunkIndex,
+        totalChunks: currentTotalChunks,
+        playbackSpeed: currentSpeed
+      });
+    }
   }
 
   return { success: true };
@@ -546,6 +559,22 @@ async function handleShowFloatingPlayer(): Promise<{ success: boolean }> {
 // Cleanup highlighting on page unload
 window.addEventListener('beforeunload', () => {
   cleanupHighlighting();
+  // Destroy floating player on page unload
+  if (floatingPlayer) {
+    floatingPlayer.destroy();
+    floatingPlayer = null;
+  }
+});
+
+// Handle overlay close event - stop playback when user closes overlay
+window.addEventListener('besttts-overlay-closed', () => {
+  // Stop playback when overlay is manually closed
+  chrome.runtime.sendMessage({
+    target: 'service-worker',
+    type: MessageType.STOP_PLAYBACK
+  }).catch(() => {
+    // Service worker might not be listening
+  });
 });
 
 // Request current state from service worker to rehydrate floating player on load
