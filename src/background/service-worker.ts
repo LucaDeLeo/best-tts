@@ -145,6 +145,7 @@ async function handleServiceWorkerMessage(
           });
         }
         resetPlaybackState();
+        broadcastStatusUpdate();
         sendResponse({ success: true });
         break;
       }
@@ -440,9 +441,9 @@ async function playChunk(chunkIndex: number): Promise<void> {
     return;
   }
 
-  // Get active tab
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
+  // Use stored activeTabId to avoid routing to wrong tab on tab switch
+  const tabId = state.activeTabId;
+  if (!tabId) {
     console.error('No active tab for playback');
     updatePlaybackState({ status: 'idle' });
     broadcastStatusUpdate();
@@ -451,8 +452,7 @@ async function playChunk(chunkIndex: number): Promise<void> {
 
   updatePlaybackState({
     status: 'generating',
-    currentChunkIndex: chunkIndex,
-    activeTabId: tab.id
+    currentChunkIndex: chunkIndex
   });
   broadcastStatusUpdate();
 
@@ -489,7 +489,7 @@ async function playChunk(chunkIndex: number): Promise<void> {
 
   // Send audio data to content script (NOT blob URL - those are origin-bound)
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, {
+    const response = await chrome.tabs.sendMessage(tabId, {
       target: 'content-script',
       type: MessageType.PLAY_AUDIO,
       audioData: result.audioData,           // base64-encoded audio

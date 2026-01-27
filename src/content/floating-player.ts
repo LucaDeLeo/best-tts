@@ -329,8 +329,8 @@ export function createFloatingPlayer(options?: FloatingPlayerOptions): {
     if (state.status === 'idle') {
       container.classList.add('hidden');
       isVisible = false;
-      // Note: isHidden is NOT reset here - that's handled by content-script
-      // when playback stops (so next playback shows player)
+      // Reset isHidden so next playback will auto-show the player
+      isHidden = false;
     } else if (!isHidden) {
       // Show only if not explicitly dismissed by user
       container.classList.remove('hidden');
