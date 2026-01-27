@@ -9,6 +9,8 @@ import {
   type AudioErrorMessage,
   type SkipToChunkMessage,
   type ExtractionResult,
+  type TTSGenerateMessage,
+  type InitHighlightingResponse,
 } from '../lib/messages';
 import {
   getPlaybackState,
@@ -17,6 +19,7 @@ import {
   generateToken,
 } from '../lib/playback-state';
 import { getSelectedVoice } from '../lib/voice-storage';
+import { splitIntoChunks } from '../lib/text-chunker';
 
 console.log('Best TTS service worker loaded');
 
@@ -225,6 +228,80 @@ async function handleServiceWorkerMessage(
         // Generate and play the target chunk
         playChunk(targetIndex).catch(console.error);
         sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.TTS_GENERATE: {
+        // Handle TTS_GENERATE directly to integrate highlighting
+        // Per Phase 4: Initialize highlighting in content script, get chunks back
+        const { text, voice } = message as TTSGenerateMessage;
+
+        if (!text || text.trim().length === 0) {
+          sendResponse({ success: false, error: 'Text cannot be empty' });
+          break;
+        }
+
+        // Get active tab for highlighting initialization
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) {
+          // No active tab - fallback to chunking without highlighting
+          console.warn('No active tab for highlighting, using fallback chunking');
+          const fallbackChunks = splitIntoChunks(text);
+          if (fallbackChunks.length === 0) {
+            sendResponse({ success: false, error: 'No valid sentences found in text' });
+            break;
+          }
+          await startPlaybackWithChunks(fallbackChunks, voice, null, sendResponse);
+          break;
+        }
+
+        // Determine highlighting mode based on extraction source
+        // If pendingExtraction exists and is article, use overlay mode
+        interface PendingExtraction {
+          text: string;
+          title?: string;
+          url?: string;
+          source: 'selection' | 'article';
+          timestamp: number;
+        }
+        const { pendingExtraction } = await chrome.storage.session.get('pendingExtraction') as { pendingExtraction?: PendingExtraction };
+        const mode = pendingExtraction?.source === 'article' ? 'overlay' : 'selection';
+
+        try {
+          // Initialize highlighting in content script
+          // This returns chunks that are aligned with DOM spans
+          const highlightResult = await chrome.tabs.sendMessage(tab.id, {
+            target: 'content-script',
+            type: MessageType.INIT_HIGHLIGHTING,
+            mode,
+            text,
+            title: pendingExtraction?.title
+          }) as InitHighlightingResponse;
+
+          if (!highlightResult.success || !highlightResult.chunks || highlightResult.chunks.length === 0) {
+            // Fallback: proceed without highlighting
+            console.warn('Highlighting init failed, proceeding without:', highlightResult.error);
+            const fallbackChunks = splitIntoChunks(text);
+            if (fallbackChunks.length === 0) {
+              sendResponse({ success: false, error: 'No valid sentences found in text' });
+              break;
+            }
+            await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse);
+            break;
+          }
+
+          // Use chunks from highlighting (guaranteed DOM alignment)
+          await startPlaybackWithChunks(highlightResult.chunks, voice, tab.id, sendResponse);
+        } catch (error) {
+          // Content script error (not injected, etc.) - fallback
+          console.warn('Could not communicate with content script:', error);
+          const fallbackChunks = splitIntoChunks(text);
+          if (fallbackChunks.length === 0) {
+            sendResponse({ success: false, error: 'No valid sentences found in text' });
+            break;
+          }
+          await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse);
+        }
         break;
       }
 
@@ -438,6 +515,40 @@ async function generateChunk(
 // Reference to prevent unused function warning
 // generateChunk is called by playChunk above
 void generateChunk;
+
+/**
+ * Initialize playback state with chunks and start playing first chunk.
+ * Used by TTS_GENERATE handler after getting chunks from highlighting or fallback.
+ */
+async function startPlaybackWithChunks(
+  chunks: string[],
+  voice: string,
+  tabId: number | null,
+  sendResponse: (response: TTSResponse & { generationToken?: string; chunks?: string[] }) => void
+): Promise<void> {
+  const token = generateToken();
+
+  updatePlaybackState({
+    status: 'generating',
+    generationToken: token,
+    chunks,
+    totalChunks: chunks.length,
+    currentChunkIndex: 0,
+    activeTabId: tabId
+  });
+
+  console.log(`Starting playback with ${chunks.length} chunks, token ${token}`);
+
+  // Start playing first chunk asynchronously
+  playChunk(0).catch(console.error);
+
+  // Respond immediately with success and the token
+  sendResponse({
+    success: true,
+    generationToken: token,
+    chunks
+  });
+}
 
 // Context menu click handler
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
