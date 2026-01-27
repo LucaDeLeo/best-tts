@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 5 - Floating Player (In Progress)
+**Current focus:** Phase 5 - Floating Player (Complete)
 
 ## Current Position
 
 Phase: 5 of 8 (Floating Player)
-Plan: 3 of 5 in current phase
-Status: In progress
-Last activity: 2026-01-27 - Completed 05-03-PLAN.md (State Sync)
+Plan: 5 of 5 in current phase
+Status: Phase complete
+Last activity: 2026-01-27 - Completed 05-05-PLAN.md (Navigation Persistence)
 
-Progress: [####################] ~62% (20/~32 plans estimated)
+Progress: [########################] ~69% (22/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 20
-- Average duration: 2.85 min
-- Total execution time: 57 min
+- Total plans completed: 22
+- Average duration: 2.77 min
+- Total execution time: 61 min
 
 **By Phase:**
 
@@ -31,10 +31,10 @@ Progress: [####################] ~62% (20/~32 plans estimated)
 | 02-basic-playback | 4 | 12 min | 3 min |
 | 03-content-extraction | 4 | 9 min | 2.25 min |
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
-| 05-floating-player | 3 | 8 min | 2.7 min |
+| 05-floating-player | 5 | 12 min | 2.4 min |
 
 **Recent Trend:**
-- Last 5 plans: 3 min, 3 min, 2 min, 2 min, 4 min
+- Last 5 plans: 3 min, 2 min, 2 min, 2 min, 3 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -108,6 +108,10 @@ Recent decisions affecting current work:
 - (05-03) SW owns authoritative state, content script holds derived/cached copy
 - (05-03) GET_STATUS returns explicit boolean fields for UI sync (isPlaying, isPaused, isGenerating)
 - (05-03) Content script requests initial state on load for page refresh sync
+- (05-05) tabs.onUpdated marks state as 'paused' on hard navigation (audio destroyed)
+- (05-05) tabs.onRemoved resets playback state when active tab closes
+- (05-05) GET_TAB_ID utility message for content script tab verification
+- (05-05) Rehydration creates player only if this tab is activeTabId with valid chunks
 
 ### Pending Todos
 
@@ -122,9 +126,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T08:59:00Z
-Stopped at: Completed 05-03-PLAN.md (State Sync)
+Last session: 2026-01-27T09:03:30Z
+Stopped at: Completed 05-05-PLAN.md (Navigation Persistence) - Phase 5 complete
 Resume file: None
 
 ---
-*Next action: Continue with 05-04-PLAN.md (Playback Control Wiring)*
+*Next action: Phase 5 (Floating Player) complete. Ready for Phase 6 (Offline Mode) or Phase 7 (Settings)*
