@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 7 - Library Storage
+**Current focus:** Phase 8 - Side Panel Polish
 
 ## Current Position
 
-Phase: 7 of 8 (Library Storage)
-Plan: 5 of 5 in current phase - COMPLETE
-Status: Phase 7 complete
-Last activity: 2026-01-27 - Completed 07-05-PLAN.md (Popup Recent Items)
+Phase: 8 of 8 (Side Panel Polish)
+Plan: 1 of 7 in current phase
+Status: In progress
+Last activity: 2026-01-27 - Completed 08-01-PLAN.md (Side Panel Setup)
 
-Progress: [################################] ~100% (32/~32 plans estimated)
+Progress: [################################-] ~85% (33/~39 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 32
+- Total plans completed: 33
 - Average duration: 2.88 min
-- Total execution time: 92 min
+- Total execution time: 95 min
 
 **By Phase:**
 
@@ -34,9 +34,10 @@ Progress: [################################] ~100% (32/~32 plans estimated)
 | 05-floating-player | 5 | 12 min | 2.4 min |
 | 06-document-support | 5 | 11 min | 2.2 min |
 | 07-library | 5 | 17 min | 3.4 min |
+| 08-side-panel-polish | 1 | 3 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 3 min, 3 min, 4 min, 3 min, 4 min
+- Last 5 plans: 3 min, 4 min, 3 min, 4 min, 3 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -144,6 +145,10 @@ Recent decisions affecting current work:
 - (07-02) Quota check includes 5MB buffer before save
 - (07-05) Recent items use safe DOM methods (createElement/appendChild) per project patterns
 - (07-05) Click recent item auto-plays after loading content from library
+- (08-01) Keep popup as default action, side panel opened via explicit button (per CONTEXT.md Decision #8)
+- (08-01) Side panel tab structure with Library and Settings sections
+- (08-01) Dark mode toggle with persistence to chrome.storage.local
+- (08-01) Safe DOM manipulation using createElement/appendChild (no innerHTML)
 
 ### Pending Todos
 
@@ -158,9 +163,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T11:34:00Z
-Stopped at: Completed 07-05-PLAN.md (Popup Recent Items)
+Last session: 2026-01-27T17:50:00Z
+Stopped at: Completed 08-01-PLAN.md (Side Panel Setup)
 Resume file: None
 
 ---
-*Next action: Phase 7 complete. Ready for Phase 8 (polish) or project wrap-up.*
+*Next action: Continue with 08-02-PLAN.md (Shared Styles) or remaining Phase 8 plans.*
