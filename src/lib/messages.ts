@@ -96,6 +96,15 @@ export const MessageType = {
   AUTOSAVE_POSITION: 'autosave-position',       // Save current reading position
   GET_LIBRARY_ITEM: 'get-library-item',         // Get item for resume
   PLAY_LIBRARY_ITEM: 'play-library-item',       // Play from library with resume
+
+  // Folder management (Phase 7)
+  FOLDER_CREATE: 'folder-create',
+  FOLDER_RENAME: 'folder-rename',
+  FOLDER_DELETE: 'folder-delete',
+  FOLDER_LIST: 'folder-list',
+  ITEM_MOVE_TO_FOLDER: 'item-move-to-folder',
+  GET_LIBRARY_ITEMS: 'get-library-items',
+  DELETE_LIBRARY_ITEM: 'delete-library-item',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -285,6 +294,44 @@ export interface PlayLibraryItemMessage extends BaseMessage {
   itemId: string;
 }
 
+// Folder management messages (Phase 7)
+export interface FolderCreateMessage extends BaseMessage {
+  type: typeof MessageType.FOLDER_CREATE;
+  name: string;
+}
+
+export interface FolderRenameMessage extends BaseMessage {
+  type: typeof MessageType.FOLDER_RENAME;
+  folderId: string;
+  name: string;
+}
+
+export interface FolderDeleteMessage extends BaseMessage {
+  type: typeof MessageType.FOLDER_DELETE;
+  folderId: string;
+}
+
+export interface FolderListMessage extends BaseMessage {
+  type: typeof MessageType.FOLDER_LIST;
+}
+
+export interface ItemMoveToFolderMessage extends BaseMessage {
+  type: typeof MessageType.ITEM_MOVE_TO_FOLDER;
+  itemId: string;
+  folderId: string | null;  // null = move to root
+}
+
+export interface GetLibraryItemsMessage extends BaseMessage {
+  type: typeof MessageType.GET_LIBRARY_ITEMS;
+  folderId?: string | null;  // null = root only, undefined = all items
+}
+
+export interface DeleteLibraryItemMessage extends BaseMessage {
+  type: typeof MessageType.DELETE_LIBRARY_ITEM;
+  itemId: string;
+  deleteContent?: boolean;  // true = delete content only, keep metadata
+}
+
 /**
  * Result returned from content extraction operations.
  * Used as sendResponse payload, not as a routable message.
@@ -328,7 +375,14 @@ export type TTSMessage =
   | LibraryStatusMessage
   | AutosavePositionMessage
   | GetLibraryItemMessage
-  | PlayLibraryItemMessage;
+  | PlayLibraryItemMessage
+  | FolderCreateMessage
+  | FolderRenameMessage
+  | FolderDeleteMessage
+  | FolderListMessage
+  | ItemMoveToFolderMessage
+  | GetLibraryItemsMessage
+  | DeleteLibraryItemMessage;
 
 // Response types
 export interface TTSResponse {
