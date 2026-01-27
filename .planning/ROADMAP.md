@@ -101,13 +101,14 @@ Plans:
 **Plans**: 5 plans in 4 waves
 
 Plans:
-- [ ] 04-01-PLAN.md — Highlight manager core, types, and CSS injection
-- [ ] 04-02-PLAN.md — Overlay mode highlighting for extracted articles
-- [ ] 04-03-PLAN.md — Selection mode highlighting with DOM wrapping
-- [ ] 04-04-PLAN.md — Content script integration with playback
-- [ ] 04-05-PLAN.md — Service worker flow and end-to-end wiring
+- [x] 04-01-PLAN.md — Highlight manager core, types, and CSS injection
+- [x] 04-02-PLAN.md — Overlay mode highlighting for extracted articles
+- [x] 04-03-PLAN.md — Selection mode highlighting with DOM wrapping
+- [x] 04-04-PLAN.md — Content script integration with playback
+- [x] 04-05-PLAN.md — Service worker flow and end-to-end wiring
 
 **Context**: Completed (CONTEXT.md - sentence-level highlighting, dual-mode architecture)
+**Completed**: 2026-01-27
 
 ### Phase 5: Floating Player
 **Goal**: User has persistent playback controls accessible on any webpage
@@ -183,7 +184,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 1. TTS Engine | 4/4 | ✓ Complete | 2026-01-27 |
 | 2. Basic Playback | 4/4 | ✓ Complete | 2026-01-27 |
 | 3. Content Extraction | 4/4 | ✓ Complete | 2026-01-27 |
-| 4. Text Highlighting | 0/5 | Not started | - |
+| 4. Text Highlighting | 5/5 | ✓ Complete | 2026-01-27 |
 | 5. Floating Player | 0/? | Not started | - |
 | 6. Document Support | 0/? | Not started | - |
 | 7. Library | 0/? | Not started | - |
@@ -191,4 +192,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27 — Phase 3 complete*
+*Last updated: 2026-01-27 — Phase 4 complete*
