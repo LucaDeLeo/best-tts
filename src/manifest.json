@@ -3,13 +3,14 @@
   "name": "Best TTS",
   "version": "0.1.0",
   "description": "High-quality local TTS",
-  "permissions": ["offscreen", "storage"],
+  "permissions": ["offscreen", "storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://huggingface.co/*",
     "https://*.huggingface.co/*",
     "https://cdn-lfs.huggingface.co/*",
     "https://cdn-lfs-us-1.huggingface.co/*",
-    "https://cdn.jsdelivr.net/*"
+    "https://cdn.jsdelivr.net/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background/service-worker.ts",
@@ -18,6 +19,13 @@
   "action": {
     "default_popup": "popup/index.html"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content-script.ts"],
+      "run_at": "document_idle"
+    }
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
   }
