@@ -12,6 +12,8 @@ This roadmap delivers a privacy-focused Chrome extension for high-quality text-t
 
 Decimal phases appear between their surrounding integers in numeric order.
 
+- 🚧 **v1 Best TTS** Phases 1-8
+
 - [ ] **Phase 1: TTS Engine** - Kokoro TTS running in browser via ONNX Runtime Web
 - [ ] **Phase 2: Basic Playback** - Play/pause, speed control, and keyboard shortcuts
 - [ ] **Phase 3: Content Extraction** - Read selected text and full webpages
@@ -33,12 +35,15 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User sees download progress when models are fetched on first use
   4. TTS works without network connection after initial model download
   5. Models persist in IndexedDB across browser sessions
-**Plans**: TBD
+**Plans**: 4 plans in 4 waves (sequential)
 
 Plans:
-- [ ] 01-01: TBD
+- [ ] 01-01-PLAN.md — Project setup, manifest, message contracts
+- [ ] 01-02-PLAN.md — Service worker + offscreen document infrastructure
+- [ ] 01-03-PLAN.md — TTS engine with Kokoro model loading and playback
+- [ ] 01-04-PLAN.md — Popup UI for text input, voice selection, controls
 
-**Research Flag**: Needs research-phase (kokoro-js API, ONNX Runtime Web configuration, offscreen document patterns)
+**Research**: Completed (01-RESEARCH.md)
 
 ### Phase 2: Basic Playback
 **Goal**: User has full control over audio playback with responsive controls
@@ -160,7 +165,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. TTS Engine | 0/? | Not started | - |
+| 1. TTS Engine | 0/4 | Planned | - |
 | 2. Basic Playback | 0/? | Not started | - |
 | 3. Content Extraction | 0/? | Not started | - |
 | 4. Text Highlighting | 0/? | Not started | - |
