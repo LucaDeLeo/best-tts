@@ -1,7 +1,28 @@
 import { ensureOffscreenDocument } from '../lib/offscreen-manager';
-import { MessageType, type TTSMessage, type TTSResponse, type MessageTarget } from '../lib/messages';
+import {
+  MessageType,
+  type TTSMessage,
+  type TTSResponse,
+  type SetSpeedMessage,
+  type HeartbeatMessage,
+  type AudioEndedMessage,
+  type AudioErrorMessage,
+} from '../lib/messages';
+import {
+  getPlaybackState,
+  updatePlaybackState,
+  resetPlaybackState,
+} from '../lib/playback-state';
 
 console.log('Best TTS service worker loaded');
+
+// Restore playback speed from storage on startup
+chrome.storage.local.get(['playbackSpeed']).then(({ playbackSpeed }) => {
+  if (typeof playbackSpeed === 'number') {
+    updatePlaybackState({ playbackSpeed });
+    console.log('Restored playback speed:', playbackSpeed);
+  }
+});
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(() => {
@@ -40,10 +61,108 @@ async function handleServiceWorkerMessage(
 ): Promise<void> {
   try {
     switch (message.type) {
-      case MessageType.GET_STATUS:
-        // Return basic status - TTS status comes from offscreen
+      case MessageType.GET_STATUS: {
+        // Return full playback state
+        const state = getPlaybackState();
+        sendResponse({
+          success: true,
+          ...state
+        } as TTSResponse & typeof state);
+        break;
+      }
+
+      case MessageType.SET_SPEED: {
+        const { speed } = message as SetSpeedMessage;
+        const clampedSpeed = Math.max(0.5, Math.min(4.0, speed));
+        updatePlaybackState({ playbackSpeed: clampedSpeed });
+
+        // Persist to storage
+        chrome.storage.local.set({ playbackSpeed: clampedSpeed });
+
+        // Forward to active tab's content script if playing
+        const currentState = getPlaybackState();
+        if (currentState.activeTabId && currentState.status === 'playing') {
+          chrome.tabs.sendMessage(currentState.activeTabId, {
+            target: 'content-script',
+            type: MessageType.SET_SPEED,
+            speed: clampedSpeed
+          }).catch(() => {
+            // Content script might not be ready
+          });
+        }
+        sendResponse({ success: true, speed: clampedSpeed } as TTSResponse & { speed: number });
+        break;
+      }
+
+      case MessageType.STOP_PLAYBACK: {
+        const prevState = getPlaybackState();
+        if (prevState.activeTabId) {
+          chrome.tabs.sendMessage(prevState.activeTabId, {
+            target: 'content-script',
+            type: MessageType.STOP_PLAYBACK
+          }).catch(() => {
+            // Content script might not be available
+          });
+        }
+        resetPlaybackState();
         sendResponse({ success: true });
         break;
+      }
+
+      case MessageType.PAUSE_AUDIO: {
+        const state = getPlaybackState();
+        if (state.activeTabId && state.status === 'playing') {
+          updatePlaybackState({ status: 'paused' });
+          chrome.tabs.sendMessage(state.activeTabId, {
+            target: 'content-script',
+            type: MessageType.PAUSE_AUDIO
+          }).catch(() => {});
+        }
+        sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.RESUME_AUDIO: {
+        const state = getPlaybackState();
+        if (state.activeTabId && state.status === 'paused') {
+          updatePlaybackState({ status: 'playing' });
+          chrome.tabs.sendMessage(state.activeTabId, {
+            target: 'content-script',
+            type: MessageType.RESUME_AUDIO
+          }).catch(() => {});
+        }
+        sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.HEARTBEAT: {
+        const hb = message as HeartbeatMessage;
+        if (hb.generationToken === getPlaybackState().generationToken) {
+          updatePlaybackState({ lastHeartbeat: Date.now() });
+        }
+        sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.AUDIO_ENDED: {
+        const ended = message as AudioEndedMessage;
+        if (ended.generationToken === getPlaybackState().generationToken) {
+          // Will be expanded in Plan 03 for auto-advance
+          updatePlaybackState({ status: 'idle' });
+        }
+        sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.AUDIO_ERROR: {
+        const errMsg = message as AudioErrorMessage;
+        console.error('Audio playback error:', errMsg.error);
+        if (errMsg.generationToken === getPlaybackState().generationToken) {
+          updatePlaybackState({ status: 'idle' });
+        }
+        sendResponse({ success: true });
+        break;
+      }
 
       default:
         sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
