@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 2 of 8 (Basic Playback)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 02-01-PLAN.md (State & Messaging)
+Last activity: 2026-01-27 - Completed 02-02-PLAN.md (Text Chunking)
 
-Progress: [#####-----] ~16% (5/~32 plans estimated)
+Progress: [######----] ~19% (6/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 4 min
-- Total execution time: 18 min
+- Total plans completed: 6
+- Average duration: 3 min
+- Total execution time: 20 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-tts-engine | 4 | 16 min | 4 min |
-| 02-basic-playback | 1 | 2 min | 2 min |
+| 02-basic-playback | 2 | 4 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 4 min, 3 min, 5 min, 4 min, 2 min
+- Last 5 plans: 3 min, 5 min, 4 min, 2 min, 2 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -58,6 +58,9 @@ Recent decisions affecting current work:
 - (02-01) PlaybackSpeed persisted to chrome.storage.local for user preference
 - (02-01) Base64-encoded audio data for cross-context transfer (blob URLs are origin-bound)
 - (02-01) Generation token pattern for matching messages to active sessions
+- (02-02) Intl.Segmenter for sentence splitting (not regex) - handles abbreviations correctly
+- (02-02) MAX_CHUNK_LENGTH=500 fallback for texts without punctuation
+- (02-02) Locale fallback chain: provided -> navigator.language -> 'en'
 
 ### Pending Todos
 
@@ -72,9 +75,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T05:38:42Z
-Stopped at: Completed 02-01-PLAN.md (State & Messaging)
+Last session: 2026-01-27T05:43:21Z
+Stopped at: Completed 02-02-PLAN.md (Text Chunking)
 Resume file: None
 
 ---
-*Next action: Execute 02-02-PLAN.md (Content Script Audio Player)*
+*Next action: Execute 02-03-PLAN.md (Content Script Audio Player)*
