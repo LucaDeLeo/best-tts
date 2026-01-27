@@ -5,32 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 1 - TTS Engine (COMPLETE)
+**Current focus:** Phase 2 - Basic Playback
 
 ## Current Position
 
-Phase: 1 of 8 (TTS Engine) - COMPLETE
-Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-01-27 - Completed 01-04-PLAN.md (Popup UI)
+Phase: 2 of 8 (Basic Playback)
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-01-27 - Completed 02-01-PLAN.md (State & Messaging)
 
-Progress: [####------] ~12% (4/~32 plans estimated)
+Progress: [#####-----] ~16% (5/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: 4 min
-- Total execution time: 16 min
+- Total execution time: 18 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-tts-engine | 4 | 16 min | 4 min |
+| 02-basic-playback | 1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 4 min, 3 min, 5 min, 4 min
+- Last 5 plans: 4 min, 3 min, 5 min, 4 min, 2 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -53,6 +54,10 @@ Recent decisions affecting current work:
 - (01-04) Grade A voices shown first with '(High Quality)' indicator
 - (01-04) Messages routed through service worker to prevent duplicate handling
 - (01-04) Safe DOM manipulation using removeChild/appendChild instead of innerHTML
+- (02-01) In-memory state resets on service worker restart (acceptable per CONTEXT.md)
+- (02-01) PlaybackSpeed persisted to chrome.storage.local for user preference
+- (02-01) Base64-encoded audio data for cross-context transfer (blob URLs are origin-bound)
+- (02-01) Generation token pattern for matching messages to active sessions
 
 ### Pending Todos
 
@@ -67,9 +72,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T04:59:00Z
-Stopped at: Completed 01-04-PLAN.md (Phase 1 complete)
+Last session: 2026-01-27T05:38:42Z
+Stopped at: Completed 02-01-PLAN.md (State & Messaging)
 Resume file: None
 
 ---
-*Next action: Execute Phase 2 (Reader Mode)*
+*Next action: Execute 02-02-PLAN.md (Content Script Audio Player)*
