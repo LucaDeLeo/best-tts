@@ -24,6 +24,11 @@ export interface PlaybackState {
   // Content script tracking
   activeTabId: number | null;     // Tab where content script is playing
   lastHeartbeat: number | null;   // Timestamp of last heartbeat
+
+  // Library context (Phase 7)
+  libraryItemId: string | null;      // If playing from library
+  libraryContentHash: string | null; // For autosave
+  libraryContentLength: number | null;
 }
 
 // Initial state
@@ -36,6 +41,9 @@ const initialState: PlaybackState = {
   playbackSpeed: 1.0,
   activeTabId: null,
   lastHeartbeat: null,
+  libraryItemId: null,
+  libraryContentHash: null,
+  libraryContentLength: null,
 };
 
 // In-memory state (service worker lifetime)

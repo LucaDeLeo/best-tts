@@ -21,7 +21,22 @@ import {
   type PendingWarning,
   type OffscreenExtractMessage,
   type DocumentType,
+  type SaveToLibraryMessage,
+  type GetLibraryStatusMessage,
+  type AutosavePositionMessage,
+  type GetLibraryItemMessage,
+  type PlayLibraryItemMessage,
 } from '../lib/messages';
+import {
+  saveLibraryItem,
+  isUrlSaved,
+  hashContent,
+  getStorageEstimateForLibrary,
+  getLibraryItemById,
+  getLibraryContent,
+} from '../lib/library-storage';
+import type { LibraryItem, LibraryContent } from '../lib/library-types';
+import { savePositionNow, resumePosition } from '../lib/autosave';
 import {
   getExtractionState,
   initExtractionState,
@@ -68,6 +83,13 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'Read This Page with Best TTS',
     contexts: ['page']  // Show on right-click anywhere on page
   });
+
+  // Library save context menu (Phase 7)
+  chrome.contextMenus.create({
+    id: 'save-to-library',
+    title: 'Save to Library',
+    contexts: ['page']  // Show on right-click anywhere on page
+  });
 });
 
 // Extended message type to include routing - use intersection since TTSMessage is a union
@@ -82,6 +104,11 @@ type ServiceWorkerMessage = TTSMessage
   | DocumentChunkCompleteMessage
   | WarningResponseMessage
   | CancelExtractionMessage
+  | SaveToLibraryMessage
+  | GetLibraryStatusMessage
+  | AutosavePositionMessage
+  | GetLibraryItemMessage
+  | PlayLibraryItemMessage
   | { type: 'get-pending-warning'; target: 'service-worker' }
   | { type: 'page-count-warning'; target: 'service-worker'; extractionId: string; pageCount: number; threshold: number };
 
@@ -398,6 +425,91 @@ async function handleServiceWorkerMessage(
         // Early page count warning from offscreen (per CONTEXT Decision #6)
         const msg = message as { extractionId: string; pageCount: number; threshold: number };
         await handlePageCountWarning(msg, sendResponse);
+        break;
+      }
+
+      // Library autosave messages (Phase 7)
+      case MessageType.AUTOSAVE_POSITION: {
+        const msg = message as AutosavePositionMessage;
+        await savePositionNow(
+          msg.itemId,
+          msg.chunkIndex,
+          msg.chunkText,
+          msg.totalChunks,
+          msg.contentLength,
+          msg.contentHash
+        );
+        sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.GET_LIBRARY_ITEM: {
+        const { itemId } = message as GetLibraryItemMessage;
+        const item = await getLibraryItemById(itemId);
+        if (!item) {
+          sendResponse({ success: false, error: 'Item not found' });
+          break;
+        }
+        const content = await getLibraryContent(itemId);
+        sendResponse({
+          success: true,
+          item,
+          content
+        });
+        break;
+      }
+
+      case MessageType.PLAY_LIBRARY_ITEM: {
+        const { itemId } = message as PlayLibraryItemMessage;
+        const item = await getLibraryItemById(itemId);
+        if (!item) {
+          sendResponse({ success: false, error: 'Item not found' });
+          break;
+        }
+        if (item.contentDeleted) {
+          sendResponse({ success: false, error: 'Content deleted. Re-extract from original page.' });
+          break;
+        }
+        const contentRecord = await getLibraryContent(itemId);
+        if (!contentRecord) {
+          sendResponse({ success: false, error: 'Content not found' });
+          break;
+        }
+
+        // Calculate resume position if we have resume data
+        let startChunkIndex = 0;
+        let resumeMethod: string | null = null;
+
+        if (item.resumeData) {
+          // Re-chunk the content to get current chunks
+          const newChunks = splitIntoChunks(contentRecord);
+          const contentHash = await hashContent(contentRecord);
+
+          const resumeResult = resumePosition({
+            storedResume: item.resumeData,
+            newContent: contentRecord,
+            newChunks,
+            newContentHash: contentHash
+          });
+
+          startChunkIndex = resumeResult.chunkIndex;
+          resumeMethod = resumeResult.method;
+
+          // Log if content changed
+          if (resumeResult.contentChanged) {
+            console.log(`Content changed since last read, resuming via ${resumeMethod}`);
+          }
+        }
+
+        sendResponse({
+          success: true,
+          item,
+          content: contentRecord,
+          contentHash: await hashContent(contentRecord),
+          resumeData: item.resumeData,
+          startChunkIndex,
+          resumeMethod
+        });
         break;
       }
 
