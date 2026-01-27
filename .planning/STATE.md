@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 6 of 8 (Document Support)
-Plan: 3 of 5 in current phase
+Plan: 4 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 06-03-PLAN.md (Text File Extraction)
+Last activity: 2026-01-27 - Completed 06-04-PLAN.md (Popup Import UI)
 
-Progress: [##########################] ~78% (25/~32 plans estimated)
+Progress: [###########################] ~81% (26/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 25
-- Average duration: 2.68 min
-- Total execution time: 67 min
+- Total plans completed: 26
+- Average duration: 2.69 min
+- Total execution time: 70 min
 
 **By Phase:**
 
@@ -32,10 +32,10 @@ Progress: [##########################] ~78% (25/~32 plans estimated)
 | 03-content-extraction | 4 | 9 min | 2.25 min |
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
 | 05-floating-player | 5 | 12 min | 2.4 min |
-| 06-document-support | 3 | 6 min | 2 min |
+| 06-document-support | 4 | 9 min | 2.25 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 3 min, 3 min, 4 min, 2 min
+- Last 5 plans: 3 min, 3 min, 4 min, 2 min, 3 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -127,6 +127,9 @@ Recent decisions affecting current work:
 - (06-03) BOM-based encoding detection for UTF-8 and UTF-16
 - (06-03) Text normalization: CRLF -> LF, remove null chars, collapse excess blank lines
 - (06-03) extractTextFile returns encoding type in result for debugging/display
+- (06-04) File size checked via file.size BEFORE file.arrayBuffer() to avoid memory allocation
+- (06-04) Chunked upload uses file.slice() for files > 10 MB per CONTEXT.md Decision #2
+- (06-04) Progress UI shows upload phase (0-50%) and extraction phase (50-100%)
 
 ### Pending Todos
 
@@ -141,9 +144,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T10:10:25Z
-Stopped at: Completed 06-02-PLAN.md (PDF Extraction)
+Last session: 2026-01-27T10:18:18Z
+Stopped at: Completed 06-04-PLAN.md (Popup Import UI)
 Resume file: None
 
 ---
-*Next action: Continue with 06-04-PLAN.md (Popup Import UI) or 06-05-PLAN.md (Cancellation and Warnings)*
+*Next action: Continue with 06-05-PLAN.md (Cancellation and Warnings)*
