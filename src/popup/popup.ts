@@ -13,16 +13,29 @@ const mainSection = document.getElementById('main-section')!;
 const textInput = document.getElementById('text-input') as HTMLTextAreaElement;
 const voiceSelect = document.getElementById('voice-select') as HTMLSelectElement;
 const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
+const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop-btn') as HTMLButtonElement;
 const message = document.getElementById('message')!;
 const errorSection = document.getElementById('error-section')!;
 const errorMessage = document.getElementById('error-message')!;
 const retryBtn = document.getElementById('retry-btn') as HTMLButtonElement;
 
+// New playback control elements
+const speedSlider = document.getElementById('speed-slider') as HTMLInputElement;
+const speedValue = document.getElementById('speed-value')!;
+const progressIndicator = document.getElementById('progress-indicator')!;
+const sentenceProgress = document.getElementById('sentence-progress')!;
+const sentenceFill = document.getElementById('sentence-fill')!;
+const skipBackBtn = document.getElementById('skip-back-btn') as HTMLButtonElement;
+const skipForwardBtn = document.getElementById('skip-forward-btn') as HTMLButtonElement;
+
 // State
 let isInitialized = false;
 let isPlaying = false;
 let isGenerating = false;
+let currentChunkIndex = 0;
+let totalChunks = 0;
+let playbackSpeed = 1.0;
 
 /**
  * Initialize popup
@@ -32,10 +45,17 @@ async function init() {
 
   // Set up event listeners
   playBtn.addEventListener('click', handlePlay);
+  pauseBtn.addEventListener('click', handlePauseResume);
   stopBtn.addEventListener('click', handleStop);
   retryBtn.addEventListener('click', handleRetry);
   voiceSelect.addEventListener('change', handleVoiceChange);
   textInput.addEventListener('input', updatePlayButtonState);
+  speedSlider.addEventListener('input', handleSpeedChange);
+  skipBackBtn.addEventListener('click', () => handleSkip(-1));
+  skipForwardBtn.addEventListener('click', () => handleSkip(1));
+
+  // Keyboard shortcuts (with focus guard)
+  document.addEventListener('keydown', handleKeydown);
 
   // Listen for messages from service worker
   chrome.runtime.onMessage.addListener((msg) => {
@@ -44,6 +64,28 @@ async function init() {
     }
     if (msg.type === MessageType.GENERATION_COMPLETE) {
       handlePlaybackComplete();
+    }
+    // Handle playback status updates
+    if (msg.type === MessageType.STATUS_UPDATE) {
+      const status = msg.status;
+      if (status.currentChunkIndex !== undefined && status.totalChunks !== undefined) {
+        currentChunkIndex = status.currentChunkIndex;
+        totalChunks = status.totalChunks;
+        updateProgressUI();
+      }
+      if (status.isPlaying !== undefined) {
+        isPlaying = status.isPlaying;
+        updatePlayPauseUI();
+      }
+      if (status.isGenerating !== undefined) {
+        isGenerating = status.isGenerating;
+        updateGeneratingUI();
+      }
+    }
+    // Handle audio errors (autoplay blocked, etc.)
+    if (msg.type === MessageType.AUDIO_ERROR) {
+      handlePlaybackComplete();
+      showMessage(msg.error || 'Audio playback failed', 'error');
     }
   });
 
@@ -80,6 +122,14 @@ async function initializeTTS() {
     const savedVoice = await getSelectedVoice();
     if (savedVoice) {
       voiceSelect.value = savedVoice;
+    }
+
+    // Restore saved speed setting
+    const { playbackSpeed: savedSpeed } = await chrome.storage.local.get(['playbackSpeed']);
+    if (typeof savedSpeed === 'number') {
+      playbackSpeed = savedSpeed;
+      speedSlider.value = String(savedSpeed);
+      speedValue.textContent = `${savedSpeed}x`;
     }
 
     isInitialized = true;
@@ -185,6 +235,7 @@ function formatVoiceName(voiceId: string): string {
 
 /**
  * Handle play button click
+ * Sends TTS_GENERATE to service worker for orchestration (chunked playback)
  */
 async function handlePlay() {
   const text = textInput.value.trim();
@@ -197,7 +248,10 @@ async function handlePlay() {
   showMessage('Generating speech...');
 
   try {
-    const response = await sendToOffscreen<TTSResponse>(
+    // Send to service worker for orchestration (NOT directly to offscreen)
+    // Service worker will: split into chunks, store in PlaybackState,
+    // then forward TTS_GENERATE_CHUNK to offscreen and PLAY_AUDIO to content script
+    const response = await sendToServiceWorker<TTSResponse>(
       MessageType.TTS_GENERATE,
       { text, voice: voiceSelect.value }
     );
@@ -206,10 +260,8 @@ async function handlePlay() {
       throw new Error(response.error || 'Failed to generate speech');
     }
 
-    isPlaying = true;
-    isGenerating = false;
-    playBtn.classList.remove('loading');
-    showMessage('Playing...', 'success');
+    // Playback state updates come via STATUS_UPDATE messages
+    // So we don't set isPlaying here - wait for status update
   } catch (error) {
     console.error('TTS generation failed:', error);
     isGenerating = false;
@@ -225,7 +277,7 @@ async function handlePlay() {
  */
 async function handleStop() {
   try {
-    await sendToOffscreen<TTSResponse>(MessageType.TTS_STOP);
+    await sendToServiceWorker<TTSResponse>(MessageType.STOP_PLAYBACK);
   } catch (error) {
     console.error('Failed to stop playback:', error);
   }
@@ -239,9 +291,14 @@ async function handleStop() {
 function handlePlaybackComplete() {
   isPlaying = false;
   isGenerating = false;
+  currentChunkIndex = 0;
+  totalChunks = 0;
   playBtn.classList.remove('loading');
+  playBtn.classList.remove('hidden');
+  pauseBtn.classList.add('hidden');
   updatePlayButtonState();
   stopBtn.disabled = true;
+  updateProgressUI();
   showMessage('Ready', 'success');
 }
 
@@ -314,6 +371,197 @@ function showError(errorText: string) {
   mainSection.classList.add('hidden');
   errorSection.classList.remove('hidden');
   errorMessage.textContent = errorText;
+}
+
+/**
+ * Handle speed slider change
+ */
+async function handleSpeedChange() {
+  const speed = parseFloat(speedSlider.value);
+  playbackSpeed = speed;
+  speedValue.textContent = `${speed}x`;
+
+  // Persist to storage
+  await chrome.storage.local.set({ playbackSpeed: speed });
+
+  // Send to service worker to update playback rate
+  try {
+    await sendToServiceWorker(MessageType.SET_SPEED, { speed });
+  } catch (error) {
+    console.error('Failed to set speed:', error);
+  }
+}
+
+/**
+ * Handle skip forward/back
+ */
+async function handleSkip(direction: -1 | 1) {
+  const targetIndex = currentChunkIndex + direction;
+  if (targetIndex < 0 || targetIndex >= totalChunks) return;
+
+  try {
+    // Send skip request to service worker
+    await chrome.runtime.sendMessage({
+      target: 'service-worker',
+      type: MessageType.SKIP_TO_CHUNK,
+      chunkIndex: targetIndex
+    });
+  } catch (error) {
+    console.error('Failed to skip:', error);
+  }
+}
+
+/**
+ * Handle pause/resume toggle
+ */
+async function handlePauseResume() {
+  try {
+    if (isPlaying) {
+      await sendToServiceWorker(MessageType.PAUSE_AUDIO);
+      pauseBtn.textContent = 'Resume';
+      isPlaying = false;
+    } else {
+      await sendToServiceWorker(MessageType.RESUME_AUDIO);
+      pauseBtn.textContent = 'Pause';
+      isPlaying = true;
+    }
+    updateProgressUI();
+  } catch (error) {
+    console.error('Failed to pause/resume:', error);
+  }
+}
+
+/**
+ * Handle keyboard shortcuts with focus guard
+ */
+function handleKeydown(e: KeyboardEvent) {
+  // Focus guard: don't handle shortcuts when typing in textarea
+  if (document.activeElement === textInput) {
+    return;
+  }
+
+  switch (e.code) {
+    case 'Space':
+      e.preventDefault();
+      if (isInitialized) {
+        if (isPlaying || pauseBtn.textContent === 'Resume') {
+          handlePauseResume();
+        } else if (!isGenerating && textInput.value.trim()) {
+          handlePlay();
+        }
+      }
+      break;
+
+    case 'ArrowLeft':
+      e.preventDefault();
+      if (!skipBackBtn.disabled) handleSkip(-1);
+      break;
+
+    case 'ArrowRight':
+      e.preventDefault();
+      if (!skipForwardBtn.disabled) handleSkip(1);
+      break;
+
+    case 'Equal': // + key
+    case 'NumpadAdd':
+      e.preventDefault();
+      adjustSpeed(0.25);
+      break;
+
+    case 'Minus':
+    case 'NumpadSubtract':
+      e.preventDefault();
+      adjustSpeed(-0.25);
+      break;
+  }
+}
+
+/**
+ * Adjust speed by delta
+ */
+function adjustSpeed(delta: number) {
+  const newSpeed = Math.max(0.5, Math.min(4, playbackSpeed + delta));
+  speedSlider.value = String(newSpeed);
+  handleSpeedChange();
+}
+
+/**
+ * Update progress indicator UI
+ */
+function updateProgressUI() {
+  if (totalChunks > 0) {
+    progressIndicator.classList.remove('hidden');
+    sentenceProgress.textContent = `Sentence ${currentChunkIndex + 1} of ${totalChunks}`;
+    const percent = ((currentChunkIndex + 1) / totalChunks) * 100;
+    sentenceFill.style.width = `${percent}%`;
+
+    // Enable/disable skip buttons based on position and playing state
+    skipBackBtn.disabled = currentChunkIndex <= 0 || (!isPlaying && pauseBtn.textContent !== 'Resume');
+    skipForwardBtn.disabled = currentChunkIndex >= totalChunks - 1 || (!isPlaying && pauseBtn.textContent !== 'Resume');
+  } else {
+    progressIndicator.classList.add('hidden');
+    skipBackBtn.disabled = true;
+    skipForwardBtn.disabled = true;
+  }
+}
+
+/**
+ * Update play/pause button UI
+ */
+function updatePlayPauseUI() {
+  if (isPlaying) {
+    playBtn.classList.add('hidden');
+    pauseBtn.classList.remove('hidden');
+    pauseBtn.disabled = false;
+    pauseBtn.textContent = 'Pause';
+    stopBtn.disabled = false;
+  } else if (totalChunks > 0 && currentChunkIndex < totalChunks) {
+    // Paused state (has active playback)
+    playBtn.classList.add('hidden');
+    pauseBtn.classList.remove('hidden');
+    pauseBtn.disabled = false;
+    pauseBtn.textContent = 'Resume';
+    stopBtn.disabled = false;
+  } else {
+    // Idle state
+    playBtn.classList.remove('hidden');
+    pauseBtn.classList.add('hidden');
+    updatePlayButtonState();
+  }
+  updateProgressUI();
+}
+
+/**
+ * Update generating UI state
+ */
+function updateGeneratingUI() {
+  if (isGenerating) {
+    playBtn.classList.add('loading');
+    showMessage('Generating speech...');
+  } else {
+    playBtn.classList.remove('loading');
+  }
+}
+
+/**
+ * Send message to service worker
+ */
+async function sendToServiceWorker<T>(
+  type: string,
+  payload?: Record<string, unknown>
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { target: 'service-worker', type, ...payload },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      }
+    );
+  });
 }
 
 /**
