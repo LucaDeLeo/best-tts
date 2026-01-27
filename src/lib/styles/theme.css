@@ -1,0 +1,108 @@
+/* Theme CSS Variables
+ * Per CONTEXT.md Decision #3: CSS custom properties with .dark-mode class
+ */
+
+:root {
+  /* Background colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e5e5e5;
+  --bg-highlight: #f0f7ff;
+  --bg-warning: #fff3cd;
+
+  /* Text colors */
+  --text-primary: #1a1a1a;
+  --text-secondary: #525252;
+  --text-muted: #737373;
+  --text-inverse: #ffffff;
+
+  /* Border colors */
+  --border-color: #d4d4d4;
+  --border-light: #e5e5e5;
+  --border-focus: #3b82f6;
+
+  /* Accent colors */
+  --accent-color: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-active: #1d4ed8;
+  --accent-light: rgba(59, 130, 246, 0.1);
+
+  /* Status colors */
+  --success-color: #22c55e;
+  --success-bg: #dcfce7;
+  --error-color: #ef4444;
+  --error-bg: #fef2f2;
+  --warning-color: #f59e0b;
+  --warning-bg: #fef3c7;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+}
+
+/* Dark mode overrides */
+:root.dark-mode,
+.dark-mode {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2a2a2a;
+  --bg-tertiary: #3a3a3a;
+  --bg-highlight: #1a2a3a;
+  --bg-warning: #3d3200;
+
+  --text-primary: #e5e5e5;
+  --text-secondary: #a3a3a3;
+  --text-muted: #737373;
+  --text-inverse: #1a1a1a;
+
+  --border-color: #404040;
+  --border-light: #333333;
+  --border-focus: #60a5fa;
+
+  --accent-color: #60a5fa;
+  --accent-hover: #3b82f6;
+  --accent-active: #2563eb;
+  --accent-light: rgba(96, 165, 250, 0.15);
+
+  --success-bg: #14532d;
+  --error-bg: #450a0a;
+  --warning-bg: #422006;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* System preference support - applied when no explicit preference is set */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light-mode) {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2a2a2a;
+    --bg-tertiary: #3a3a3a;
+    --bg-highlight: #1a2a3a;
+    --bg-warning: #3d3200;
+
+    --text-primary: #e5e5e5;
+    --text-secondary: #a3a3a3;
+    --text-muted: #737373;
+    --text-inverse: #1a1a1a;
+
+    --border-color: #404040;
+    --border-light: #333333;
+    --border-focus: #60a5fa;
+
+    --accent-color: #60a5fa;
+    --accent-hover: #3b82f6;
+    --accent-active: #2563eb;
+    --accent-light: rgba(96, 165, 250, 0.15);
+
+    --success-bg: #14532d;
+    --error-bg: #450a0a;
+    --warning-bg: #422006;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  }
+}
