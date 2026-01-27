@@ -45,15 +45,41 @@
         </select>
       </div>
 
+      <!-- Speed Control -->
+      <div class="control-row">
+        <label for="speed-slider">Speed:</label>
+        <input type="range" id="speed-slider" min="0.5" max="4" step="0.25" value="1">
+        <span id="speed-value">1x</span>
+      </div>
+
+      <!-- Progress Indicator -->
+      <div id="progress-indicator" class="progress-indicator-section hidden">
+        <span id="sentence-progress">Sentence 0 of 0</span>
+        <div class="sentence-bar">
+          <div id="sentence-fill" class="sentence-fill"></div>
+        </div>
+      </div>
+
       <!-- Playback Controls -->
-      <div class="controls">
+      <div class="button-row">
+        <button id="skip-back-btn" class="control-btn" disabled title="Previous sentence (Left Arrow)">
+          <span class="icon">&#9198;</span>
+        </button>
         <button id="play-btn" class="btn btn-primary" disabled>
           <span class="btn-text">Speak</span>
           <span class="btn-loading hidden">Generating...</span>
         </button>
+        <button id="pause-btn" class="btn btn-primary hidden" disabled>Pause</button>
+        <button id="skip-forward-btn" class="control-btn" disabled title="Next sentence (Right Arrow)">
+          <span class="icon">&#9197;</span>
+        </button>
         <button id="stop-btn" class="btn btn-secondary" disabled>
           Stop
         </button>
+      </div>
+
+      <div class="shortcuts-hint">
+        <small>Space: Play/Pause | Arrows: Skip | +/-: Speed</small>
       </div>
 
       <!-- Status Messages -->
