@@ -32,6 +32,7 @@ import {
   type ItemMoveToFolderMessage,
   type GetLibraryItemsMessage,
   type DeleteLibraryItemMessage,
+  type GetRecentItemsMessage,
 } from '../lib/messages';
 import {
   saveLibraryItem,
@@ -45,6 +46,7 @@ import {
   deleteFolder,
   getFolders,
   getLibraryItems,
+  getRecentItems,
   updateLibraryItem,
   deleteLibraryItem,
   getLibraryDB,
@@ -130,6 +132,7 @@ type ServiceWorkerMessage = TTSMessage
   | ItemMoveToFolderMessage
   | GetLibraryItemsMessage
   | DeleteLibraryItemMessage
+  | GetRecentItemsMessage
   | { type: 'get-pending-warning'; target: 'service-worker' }
   | { type: 'page-count-warning'; target: 'service-worker'; extractionId: string; pageCount: number; threshold: number };
 
@@ -662,6 +665,13 @@ async function handleServiceWorkerMessage(
           await deleteLibraryItem(itemId);
           sendResponse({ success: true });
         }
+        break;
+      }
+
+      case MessageType.GET_RECENT_ITEMS: {
+        const { limit = 5 } = message as GetRecentItemsMessage;
+        const items = await getRecentItems(limit);
+        sendResponse({ success: true, items });
         break;
       }
 
