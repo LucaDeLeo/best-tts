@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 4 - Text Highlighting (Complete)
+**Current focus:** Phase 5 - Floating Player (In Progress)
 
 ## Current Position
 
-Phase: 4 of 8 (Text Highlighting)
-Plan: 5 of 5 in current phase
-Status: Phase complete
-Last activity: 2026-01-27 - Completed 04-05-PLAN.md (Flow Integration)
+Phase: 5 of 8 (Floating Player)
+Plan: 1 of 5 in current phase
+Status: In progress
+Last activity: 2026-01-27 - Completed 05-01-PLAN.md (Shadow DOM Component)
 
-Progress: [#################] ~53% (17/~32 plans estimated)
+Progress: [##################] ~56% (18/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
-- Average duration: 2.9 min
-- Total execution time: 49 min
+- Total plans completed: 18
+- Average duration: 2.8 min
+- Total execution time: 51 min
 
 **By Phase:**
 
@@ -31,9 +31,10 @@ Progress: [#################] ~53% (17/~32 plans estimated)
 | 02-basic-playback | 4 | 12 min | 3 min |
 | 03-content-extraction | 4 | 9 min | 2.25 min |
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
+| 05-floating-player | 1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 4 min, 1 min, 1 min, 3 min, 3 min
+- Last 5 plans: 1 min, 1 min, 3 min, 3 min, 2 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -96,6 +97,10 @@ Recent decisions affecting current work:
 - (04-05) TTS_GENERATE handled directly in service worker (not forwarded to offscreen)
 - (04-05) INIT_HIGHLIGHTING sent to content script before TTS playback
 - (04-05) Fallback to splitIntoChunks if highlighting initialization fails
+- (05-01) Shadow DOM closed mode for security (page scripts cannot access internal state)
+- (05-01) Fixed bottom-right position with max z-index (2147483647)
+- (05-01) Inline styles with :host { all: initial } for complete CSS isolation
+- (05-01) Player starts hidden, shows on first PLAY_AUDIO
 
 ### Pending Todos
 
@@ -110,9 +115,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T08:04:16Z
-Stopped at: Completed 04-05-PLAN.md (Flow Integration)
+Last session: 2026-01-27T08:52:07Z
+Stopped at: Completed 05-01-PLAN.md (Shadow DOM Component)
 Resume file: None
 
 ---
-*Next action: Phase 4 complete. Ready for Phase 5 or milestone verification.*
+*Next action: Continue with 05-02-PLAN.md (Playback Controls)*
