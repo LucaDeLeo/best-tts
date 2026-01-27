@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 Phase: 4 of 8 (Text Highlighting)
 Plan: 3 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 04-03-PLAN.md (Selection Mode Highlighting)
+Last activity: 2026-01-27 - Completed 04-02-PLAN.md (Overlay Mode Highlighting)
 
 Progress: [###############] ~47% (15/~32 plans estimated)
 
@@ -84,6 +84,9 @@ Recent decisions affecting current work:
 - (04-01) Added Intl.Segmenter type declarations (ES2022 lib not loading properly)
 - (04-01) Updated tsconfig.json with ES2022 lib for Intl support
 - (04-01) 3-second user scroll debounce before auto-scroll resumes
+- (04-02) Overlay container uses fixed positioning with max z-index
+- (04-02) textContent and DOM methods (no innerHTML) for XSS prevention
+- (04-02) Close button dispatches custom event for cleanup coordination
 - (04-03) DOM text node walking via TreeWalker (NOT selection.toString())
 - (04-03) Cumulative offset map for accurate sentence boundary mapping
 - (04-03) splitText() calls tracked in SplitNodeRecord for DOM restoration
@@ -101,8 +104,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T07:53:34Z
-Stopped at: Completed 04-03-PLAN.md (Selection Mode Highlighting)
+Last session: 2026-01-27T07:53:59Z
+Stopped at: Completed 04-02-PLAN.md (Overlay Mode Highlighting)
 Resume file: None
 
 ---
