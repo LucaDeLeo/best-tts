@@ -1,6 +1,7 @@
 import { ensureOffscreenDocument } from '../lib/offscreen-manager';
 import {
   MessageType,
+  EXTRACTION_THRESHOLDS,
   type TTSMessage,
   type TTSResponse,
   type SetSpeedMessage,
@@ -11,7 +12,27 @@ import {
   type ExtractionResult,
   type TTSGenerateMessage,
   type InitHighlightingResponse,
+  type ExtractDocumentMessage,
+  type DocumentChunkMessage,
+  type DocumentChunkCompleteMessage,
+  type WarningResponseMessage,
+  type CancelExtractionMessage,
+  type DocumentExtractionResult,
+  type PendingWarning,
+  type OffscreenExtractMessage,
+  type DocumentType,
 } from '../lib/messages';
+import {
+  getExtractionState,
+  initExtractionState,
+  updateExtractionState,
+  clearExtractionState,
+  trackChunkReceived,
+  allChunksReceived,
+  setPendingWarning,
+  clearPendingWarning,
+  isExtractionCancelled,
+} from '../lib/extraction-state';
 import {
   getPlaybackState,
   updatePlaybackState,
@@ -54,6 +75,16 @@ type RoutableMessage = TTSMessage & {
   forwardTo?: 'offscreen';
 };
 
+// Union type for all messages handled by service worker
+type ServiceWorkerMessage = TTSMessage
+  | ExtractDocumentMessage
+  | DocumentChunkMessage
+  | DocumentChunkCompleteMessage
+  | WarningResponseMessage
+  | CancelExtractionMessage
+  | { type: 'get-pending-warning'; target: 'service-worker' }
+  | { type: 'page-count-warning'; target: 'service-worker'; extractionId: string; pageCount: number; threshold: number };
+
 // Handle GET_TAB_ID requests - simple utility to let content script know its tab ID
 // This is used for rehydration logic to verify the content script is in the active playback tab
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -65,20 +96,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Main message router
-chrome.runtime.onMessage.addListener((message: RoutableMessage, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: RoutableMessage | ServiceWorkerMessage, sender, sendResponse) => {
   // Only handle messages intended for service worker
   if (message.target !== 'service-worker') {
     return false; // Not for us
   }
 
   // Check if this message should be forwarded to offscreen
-  if (message.forwardTo === 'offscreen') {
-    routeToOffscreen(message, sendResponse);
+  if ('forwardTo' in message && message.forwardTo === 'offscreen') {
+    routeToOffscreen(message as RoutableMessage, sendResponse);
     return true; // Keep channel open for async response
   }
 
   // Handle messages directed at the service worker itself
-  handleServiceWorkerMessage(message, sendResponse);
+  handleServiceWorkerMessage(message as ServiceWorkerMessage, sendResponse);
   return true; // Keep channel open for async response
 });
 
@@ -86,8 +117,9 @@ chrome.runtime.onMessage.addListener((message: RoutableMessage, sender, sendResp
  * Handle messages directed at the service worker itself
  */
 async function handleServiceWorkerMessage(
-  message: TTSMessage,
-  sendResponse: (response: TTSResponse) => void
+  message: ServiceWorkerMessage,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sendResponse: (response: any) => void
 ): Promise<void> {
   try {
     switch (message.type) {
@@ -323,6 +355,49 @@ async function handleServiceWorkerMessage(
           }
           await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse);
         }
+        break;
+      }
+
+      // Document extraction messages (Phase 6)
+      case MessageType.EXTRACT_DOCUMENT: {
+        const msg = message as unknown as ExtractDocumentMessage;
+        await handleExtractDocument(msg, sendResponse);
+        break;
+      }
+
+      case MessageType.DOCUMENT_CHUNK: {
+        const msg = message as unknown as DocumentChunkMessage;
+        await handleDocumentChunk(msg, sendResponse);
+        break;
+      }
+
+      case MessageType.DOCUMENT_CHUNK_COMPLETE: {
+        const msg = message as unknown as DocumentChunkCompleteMessage;
+        await handleDocumentChunkComplete(msg, sendResponse);
+        break;
+      }
+
+      case MessageType.WARNING_RESPONSE: {
+        const msg = message as unknown as WarningResponseMessage;
+        await handleWarningResponse(msg, sendResponse);
+        break;
+      }
+
+      case MessageType.CANCEL_EXTRACTION: {
+        const msg = message as unknown as CancelExtractionMessage;
+        await handleCancelExtraction(msg, sendResponse);
+        break;
+      }
+
+      case MessageType.GET_PENDING_WARNING: {
+        handleGetPendingWarning(sendResponse);
+        break;
+      }
+
+      case MessageType.PAGE_COUNT_WARNING: {
+        // Early page count warning from offscreen (per CONTEXT Decision #6)
+        const msg = message as { extractionId: string; pageCount: number; threshold: number };
+        await handlePageCountWarning(msg, sendResponse);
         break;
       }
 
@@ -725,6 +800,433 @@ async function storePendingExtraction(result: ExtractionResult) {
       timestamp: Date.now()
     }
   });
+}
+
+// ============================================================================
+// Document Extraction Handlers (Phase 6)
+// ============================================================================
+
+// Resolvers for page count warnings (so WARNING_RESPONSE can continue extraction)
+const pageCountWarningResolvers = new Map<string, (shouldContinue: boolean) => void>();
+
+/**
+ * Handle document extraction request from popup.
+ * Per CONTEXT.md Decision #2: Different handling for small vs large files.
+ */
+async function handleExtractDocument(
+  msg: ExtractDocumentMessage,
+  sendResponse: (response: DocumentExtractionResult) => void
+): Promise<void> {
+  const { documentType, data, filename, fileSize, extractionId } = msg;
+
+  // Initialize extraction state
+  initExtractionState(extractionId, documentType, filename, fileSize);
+
+  // Ensure offscreen document exists
+  await ensureOffscreenDocument();
+
+  // If data is null, this is a chunked upload - initialize chunk storage in offscreen
+  if (data === null) {
+    console.log(`Starting chunked upload for ${filename} (${fileSize} bytes)`);
+
+    // Initialize chunk storage in offscreen document's IndexedDB
+    await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: MessageType.INIT_CHUNK_STORAGE,
+      extractionId,
+      documentType,
+      filename,
+      fileSize
+    });
+
+    sendResponse({
+      success: true,
+      extractionId,
+      // Partial response - extraction will complete after chunks
+    } as DocumentExtractionResult);
+    return;
+  }
+
+  // Direct upload - proceed with extraction
+  await performExtraction(data, documentType, filename, extractionId, sendResponse);
+}
+
+/**
+ * Handle incoming chunk for chunked upload.
+ * Per CONTEXT.md Decision #2: Forward chunks to offscreen IndexedDB, don't store in SW memory.
+ */
+async function handleDocumentChunk(
+  msg: DocumentChunkMessage,
+  sendResponse: (response: { success: boolean }) => void
+): Promise<void> {
+  const { extractionId, chunkIndex, totalChunks, data } = msg;
+
+  // Check if extraction was cancelled
+  if (isExtractionCancelled(extractionId)) {
+    sendResponse({ success: false });
+    return;
+  }
+
+  // Forward chunk to offscreen document for IndexedDB storage
+  // SW doesn't hold the chunk data - it goes directly to offscreen
+  await chrome.runtime.sendMessage({
+    target: 'offscreen',
+    type: MessageType.STORE_CHUNK,
+    extractionId,
+    chunkIndex,
+    totalChunks,
+    data
+  });
+
+  // Track metadata only (not the data itself)
+  trackChunkReceived(extractionId, chunkIndex, totalChunks);
+
+  // Update progress
+  updateExtractionState({
+    progress: Math.round(((chunkIndex + 1) / totalChunks) * 50) // 50% for upload
+  });
+
+  sendResponse({ success: true });
+}
+
+/**
+ * Handle chunk upload completion - trigger extraction in offscreen.
+ * Per CONTEXT.md Decision #2: Offscreen reassembles from IndexedDB and extracts.
+ */
+async function handleDocumentChunkComplete(
+  msg: DocumentChunkCompleteMessage,
+  sendResponse: (response: DocumentExtractionResult) => void
+): Promise<void> {
+  const { extractionId } = msg;
+
+  // Check if extraction was cancelled
+  if (isExtractionCancelled(extractionId)) {
+    // Tell offscreen to clean up IndexedDB chunks
+    await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: MessageType.CLEANUP_CHUNKS,
+      extractionId
+    }).catch(() => {});
+
+    sendResponse({
+      success: false,
+      error: 'Extraction cancelled',
+      extractionId
+    });
+    return;
+  }
+
+  const state = getExtractionState();
+  if (!state) {
+    sendResponse({
+      success: false,
+      error: 'No extraction in progress',
+      extractionId
+    });
+    return;
+  }
+
+  // Verify all chunks received
+  if (!allChunksReceived(extractionId)) {
+    sendResponse({
+      success: false,
+      error: 'Not all chunks received',
+      extractionId
+    });
+    clearExtractionState();
+    return;
+  }
+
+  updateExtractionState({ status: 'extracting' });
+
+  // Tell offscreen to reassemble from IndexedDB and extract
+  // The offscreen document holds the chunks in IndexedDB, not the SW
+  const result = await chrome.runtime.sendMessage({
+    target: 'offscreen',
+    type: MessageType.EXTRACT_FROM_CHUNKS,
+    extractionId,
+    documentType: state.documentType,
+    filename: state.filename
+  }) as DocumentExtractionResult;
+
+  // Handle result with warning checks
+  await handleExtractionResultWithWarnings(result, extractionId, sendResponse);
+}
+
+/**
+ * Perform actual extraction by sending to offscreen document.
+ * For direct uploads (non-chunked).
+ */
+async function performExtraction(
+  data: ArrayBuffer,
+  documentType: DocumentType,
+  filename: string,
+  extractionId: string,
+  sendResponse: (response: DocumentExtractionResult) => void
+): Promise<void> {
+  try {
+    updateExtractionState({ status: 'extracting' });
+
+    // Send to offscreen for extraction
+    const result = await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: MessageType.EXTRACT_DOCUMENT,
+      documentType,
+      data,
+      filename,
+      extractionId
+    } as OffscreenExtractMessage) as DocumentExtractionResult;
+
+    await handleExtractionResultWithWarnings(result, extractionId, sendResponse);
+
+  } catch (error) {
+    console.error('Extraction failed:', error);
+    clearExtractionState();
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Extraction failed',
+      extractionId
+    });
+  }
+}
+
+/**
+ * Handle extraction result, checking for soft limit warnings.
+ * Per CONTEXT.md Decision #6: Page count and text length warnings.
+ *
+ * NOTE: Page count warning is now triggered EARLY (after PDF metadata load)
+ * by the offscreen document. This function handles the warning response
+ * and text length warnings (which require full extraction).
+ */
+async function handleExtractionResultWithWarnings(
+  result: DocumentExtractionResult,
+  extractionId: string,
+  sendResponse: (response: DocumentExtractionResult) => void
+): Promise<void> {
+  // Check if cancelled during extraction
+  if (isExtractionCancelled(extractionId)) {
+    sendResponse({
+      success: false,
+      error: 'Extraction cancelled',
+      extractionId
+    });
+    return;
+  }
+
+  if (!result.success) {
+    clearExtractionState();
+    sendResponse(result);
+    return;
+  }
+
+  // Check text length warning (page count warning handled early by offscreen)
+  if (result.textLength && result.textLength > EXTRACTION_THRESHOLDS.TEXT_LENGTH) {
+    const warning: PendingWarning = {
+      type: 'textLength',
+      value: result.textLength,
+      threshold: EXTRACTION_THRESHOLDS.TEXT_LENGTH,
+      extractionId
+    };
+
+    updateExtractionState({
+      status: 'warning',
+      textLength: result.textLength,
+      pendingWarning: warning
+    });
+
+    await chrome.storage.session.set({
+      pendingExtractionResult: result
+    });
+
+    setPendingWarning(warning, () => {
+      clearExtractionState();
+      chrome.storage.session.remove('pendingExtractionResult');
+    });
+
+    chrome.runtime.sendMessage({
+      target: 'popup',
+      type: MessageType.EXTRACTION_WARNING,
+      warning
+    }).catch(() => {});
+
+    sendResponse({
+      success: true,
+      extractionId,
+      // Partial response - waiting for user confirmation
+    } as DocumentExtractionResult);
+    return;
+  }
+
+  // No warnings - complete successfully
+  clearExtractionState();
+  sendResponse(result);
+}
+
+/**
+ * Handle user response to a warning.
+ * Handles both early page count warnings (during extraction) and
+ * post-extraction text length warnings.
+ */
+async function handleWarningResponse(
+  msg: WarningResponseMessage,
+  sendResponse: (response: DocumentExtractionResult) => void
+): Promise<void> {
+  const { extractionId, action } = msg;
+
+  clearPendingWarning(extractionId);
+
+  // Check if this is an early page count warning (extraction paused, waiting for response)
+  const pageCountResolver = pageCountWarningResolvers.get(extractionId);
+  if (pageCountResolver) {
+    pageCountWarningResolvers.delete(extractionId);
+
+    if (action === 'cancel') {
+      pageCountResolver(false); // Tell offscreen to abort
+      clearExtractionState();
+      sendResponse({
+        success: false,
+        error: 'Extraction cancelled by user',
+        extractionId
+      });
+    } else {
+      pageCountResolver(true); // Tell offscreen to continue
+      // Don't send response yet - extraction will complete and respond later
+      // The offscreen will send the final result
+    }
+    return;
+  }
+
+  // Post-extraction warning (text length) - result already stored
+  if (action === 'cancel') {
+    clearExtractionState();
+    await chrome.storage.session.remove('pendingExtractionResult');
+    sendResponse({
+      success: false,
+      error: 'Extraction cancelled by user',
+      extractionId
+    });
+    return;
+  }
+
+  // User chose to continue - retrieve stored result
+  const { pendingExtractionResult } = await chrome.storage.session.get('pendingExtractionResult');
+  await chrome.storage.session.remove('pendingExtractionResult');
+
+  if (!pendingExtractionResult) {
+    clearExtractionState();
+    sendResponse({
+      success: false,
+      error: 'Extraction result not found',
+      extractionId
+    });
+    return;
+  }
+
+  clearExtractionState();
+  sendResponse(pendingExtractionResult as DocumentExtractionResult);
+}
+
+/**
+ * Handle extraction cancellation.
+ * Per CONTEXT.md Decision #11: Support cancellation for long extractions.
+ */
+async function handleCancelExtraction(
+  msg: CancelExtractionMessage,
+  sendResponse: (response: { success: boolean }) => void
+): Promise<void> {
+  const { extractionId } = msg;
+  const state = getExtractionState();
+
+  if (state?.extractionId === extractionId) {
+    // Notify offscreen to abort extraction and clean up IndexedDB chunks
+    await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: MessageType.CANCEL_EXTRACTION,
+      extractionId
+    }).catch(() => {});
+
+    clearExtractionState();
+    chrome.storage.session.remove('pendingExtractionResult').catch(() => {});
+  }
+
+  sendResponse({ success: true });
+}
+
+/**
+ * Handle request for pending warning (popup reopen).
+ * Per CONTEXT.md Decision #6: Popup checks for pending warning on load.
+ */
+function handleGetPendingWarning(
+  sendResponse: (response: { warning: PendingWarning | null }) => void
+): void {
+  const state = getExtractionState();
+  sendResponse({
+    warning: state?.pendingWarning || null
+  });
+}
+
+/**
+ * Handle early page count warning from offscreen (per CONTEXT Decision #6).
+ * This is called DURING extraction, BEFORE full text extraction begins.
+ * Extraction is paused in offscreen waiting for this response.
+ */
+async function handlePageCountWarning(
+  msg: { extractionId: string; pageCount: number; threshold: number },
+  sendResponse: (response: { continue: boolean }) => void
+): Promise<void> {
+  const { extractionId, pageCount, threshold } = msg;
+
+  // Check if extraction was cancelled
+  if (isExtractionCancelled(extractionId)) {
+    sendResponse({ continue: false });
+    return;
+  }
+
+  const warning: PendingWarning = {
+    type: 'pageCount',
+    value: pageCount,
+    threshold,
+    extractionId
+  };
+
+  // Update state to waiting for user confirmation
+  updateExtractionState({
+    status: 'warning',
+    pageCount,
+    pendingWarning: warning
+  });
+
+  // Try to send warning to popup if open
+  chrome.runtime.sendMessage({
+    target: 'popup',
+    type: MessageType.EXTRACTION_WARNING,
+    warning
+  }).catch(() => {
+    // Popup not open - warning will be retrieved when popup opens
+  });
+
+  // Show badge indicator
+  chrome.action.setBadgeText({ text: '!' }).catch(() => {});
+  chrome.action.setBadgeBackgroundColor({ color: '#ffc107' }).catch(() => {});
+
+  // Store a Promise resolver so WARNING_RESPONSE can resolve it
+  // This allows the offscreen extraction to pause and wait
+  const continuePromise = new Promise<boolean>((resolve) => {
+    pageCountWarningResolvers.set(extractionId, resolve);
+
+    // Set timeout for auto-cancel (5 minutes per CONTEXT.md)
+    setTimeout(() => {
+      if (pageCountWarningResolvers.has(extractionId)) {
+        console.log('Page count warning timeout - auto-cancelling');
+        pageCountWarningResolvers.delete(extractionId);
+        resolve(false);
+        clearExtractionState();
+      }
+    }, 5 * 60 * 1000);
+  });
+
+  const shouldContinue = await continuePromise;
+  sendResponse({ continue: shouldContinue });
 }
 
 // Listen for download progress from offscreen and broadcast to popup
