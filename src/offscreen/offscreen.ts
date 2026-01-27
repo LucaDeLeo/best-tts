@@ -1,4 +1,12 @@
-import { MessageType, type TTSMessage, type TTSResponse, type VoiceListResponse, type TTSGenerateChunkMessage } from '../lib/messages';
+import {
+  MessageType,
+  type TTSMessage,
+  type TTSResponse,
+  type VoiceListResponse,
+  type TTSGenerateChunkMessage,
+  type OffscreenExtractMessage,
+  type DocumentExtractionResult,
+} from '../lib/messages';
 import { TTSEngine, type VoiceId } from '../lib/tts-engine';
 import { setDownloadProgress, clearDownloadProgress, setCacheStatus } from '../lib/model-cache';
 import { getSelectedVoice } from '../lib/voice-storage';
@@ -19,8 +27,11 @@ interface GenerateResponse extends TTSResponse {
   chunks?: string[];
 }
 
+// Union type for all messages handled by offscreen document
+type OffscreenHandledMessage = TTSMessage | OffscreenExtractMessage;
+
 // Message handler
-chrome.runtime.onMessage.addListener((message: TTSMessage, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: OffscreenHandledMessage, sender, sendResponse) => {
   // Only handle messages intended for offscreen document
   if (message.target !== 'offscreen') {
     return false;
@@ -42,7 +53,7 @@ chrome.runtime.onMessage.addListener((message: TTSMessage, sender, sendResponse)
 /**
  * Main message dispatcher
  */
-async function handleMessage(message: TTSMessage): Promise<TTSResponse | VoiceListResponse | ChunkReadyResponse | GenerateResponse> {
+async function handleMessage(message: OffscreenHandledMessage): Promise<TTSResponse | VoiceListResponse | ChunkReadyResponse | GenerateResponse | DocumentExtractionResult> {
   switch (message.type) {
     case MessageType.TTS_INIT:
       return handleInit();
@@ -61,6 +72,9 @@ async function handleMessage(message: TTSMessage): Promise<TTSResponse | VoiceLi
 
     case MessageType.GET_STATUS:
       return handleGetStatus();
+
+    case MessageType.EXTRACT_DOCUMENT:
+      return handleExtractDocument(message as unknown as OffscreenExtractMessage);
 
     default:
       return { success: false, error: `Unknown message type: ${(message as TTSMessage).type}` };
@@ -245,4 +259,52 @@ async function handleGetStatus(): Promise<TTSResponse & { initialized: boolean }
     success: true,
     initialized: TTSEngine.isInitialized()
   };
+}
+
+/**
+ * Extract text from a document (PDF or text file).
+ * Full implementation in 06-02-PLAN.md (PDF) and 06-03-PLAN.md (text files).
+ *
+ * Per CONTEXT.md Decision #2: Offscreen receives ArrayBuffer and performs extraction.
+ * PDF.js and TextDecoder run here to avoid popup memory pressure.
+ */
+async function handleExtractDocument(msg: OffscreenExtractMessage): Promise<DocumentExtractionResult> {
+  const { documentType, data, filename, extractionId } = msg;
+
+  console.log(`Extracting ${documentType} document: ${filename} (${data.byteLength} bytes)`);
+
+  try {
+    switch (documentType) {
+      case 'pdf':
+        // Implemented in 06-02-PLAN.md
+        return {
+          success: false,
+          error: 'PDF extraction not yet implemented',
+          extractionId
+        };
+
+      case 'txt':
+      case 'md':
+        // Implemented in 06-03-PLAN.md
+        return {
+          success: false,
+          error: 'Text file extraction not yet implemented',
+          extractionId
+        };
+
+      default:
+        return {
+          success: false,
+          error: `Unsupported document type: ${documentType}`,
+          extractionId
+        };
+    }
+  } catch (error) {
+    console.error('Document extraction failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Document extraction failed',
+      extractionId
+    };
+  }
 }
