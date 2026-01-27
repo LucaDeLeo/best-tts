@@ -1547,5 +1547,453 @@ async function playRecentItem(itemId: string) {
   }
 }
 
+// ============================================================================
+// Library Panel Functions
+// ============================================================================
+
+/**
+ * Toggle library panel open/closed.
+ */
+async function toggleLibraryPanel() {
+  if (libraryPanelOpen) {
+    closeLibraryPanel();
+  } else {
+    await openLibraryPanel();
+  }
+}
+
+/**
+ * Open library panel and load data.
+ */
+async function openLibraryPanel() {
+  libraryPanelOpen = true;
+  mainSection.classList.add('hidden');
+  recentSection.classList.add('hidden');
+  librarySection.classList.remove('hidden');
+
+  // Load folders and items
+  await loadFolders();
+  await loadLibraryItems();
+
+  // Select 'All Items' by default
+  currentFolderId = null;
+  updateFolderSelection();
+}
+
+/**
+ * Close library panel and return to main view.
+ */
+function closeLibraryPanel() {
+  libraryPanelOpen = false;
+  librarySection.classList.add('hidden');
+  mainSection.classList.remove('hidden');
+
+  // Reload recent items (may have changed)
+  loadRecentItems();
+
+  // Clear selection
+  selectedItemId = null;
+  itemActions.classList.add('hidden');
+}
+
+/**
+ * Load folders from service worker.
+ */
+async function loadFolders() {
+  try {
+    const response = await sendToServiceWorker<{ success: boolean; folders: FolderData[] }>(
+      MessageType.FOLDER_LIST
+    );
+
+    if (response.success) {
+      folders = response.folders;
+      renderFolders();
+      updateMoveToFolderSelect();
+    }
+  } catch (error) {
+    console.error('Failed to load folders:', error);
+  }
+}
+
+/**
+ * Load library items, optionally filtered by folder.
+ */
+async function loadLibraryItems() {
+  try {
+    const response = await sendToServiceWorker<{ success: boolean; items: LibraryItemData[] }>(
+      MessageType.GET_LIBRARY_ITEMS,
+      { folderId: currentFolderId }
+    );
+
+    if (response.success) {
+      libraryItems = response.items;
+      renderLibraryItems();
+    }
+  } catch (error) {
+    console.error('Failed to load library items:', error);
+  }
+}
+
+/**
+ * Render folder list.
+ */
+function renderFolders() {
+  // Clear existing folders (except 'All Items')
+  while (folderList.firstChild) {
+    folderList.removeChild(folderList.firstChild);
+  }
+
+  for (const folder of folders) {
+    const folderEl = document.createElement('div');
+    folderEl.className = 'folder-item';
+    folderEl.dataset.folderId = folder.id;
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'folder-icon';
+    iconSpan.textContent = '\u{1F4C1}'; // folder icon
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'folder-name';
+    nameSpan.textContent = folder.name;
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'folder-actions-inline';
+
+    const renameBtn = document.createElement('button');
+    renameBtn.className = 'folder-action-btn';
+    renameBtn.textContent = '\u{270F}'; // pencil
+    renameBtn.title = 'Rename';
+    renameBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleRenameFolder(folder.id, folder.name);
+    });
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'folder-action-btn';
+    deleteBtn.textContent = '\u{2716}'; // X
+    deleteBtn.title = 'Delete folder';
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleDeleteFolder(folder.id);
+    });
+
+    actionsDiv.appendChild(renameBtn);
+    actionsDiv.appendChild(deleteBtn);
+
+    folderEl.appendChild(iconSpan);
+    folderEl.appendChild(nameSpan);
+    folderEl.appendChild(actionsDiv);
+
+    folderEl.addEventListener('click', () => selectFolder(folder.id));
+    folderList.appendChild(folderEl);
+  }
+}
+
+/**
+ * Select a folder and load its items.
+ */
+async function selectFolder(folderId: string | null) {
+  currentFolderId = folderId;
+  selectedItemId = null;
+  itemActions.classList.add('hidden');
+  updateFolderSelection();
+  await loadLibraryItems();
+}
+
+/**
+ * Update folder selection UI.
+ */
+function updateFolderSelection() {
+  // Update 'All Items' folder
+  const allItemsEl = document.querySelector('.folder-item[data-folder-id="root"]');
+  if (allItemsEl) {
+    if (currentFolderId === null) {
+      allItemsEl.classList.add('active');
+    } else {
+      allItemsEl.classList.remove('active');
+    }
+
+    // Add click handler for 'All Items' (only once)
+    if (!(allItemsEl as HTMLElement).dataset.listenerAttached) {
+      allItemsEl.addEventListener('click', () => selectFolder(null));
+      (allItemsEl as HTMLElement).dataset.listenerAttached = 'true';
+    }
+  }
+
+  // Update other folders
+  const folderEls = folderList.querySelectorAll('.folder-item');
+  folderEls.forEach((el) => {
+    const fId = (el as HTMLElement).dataset.folderId;
+    if (fId === currentFolderId) {
+      el.classList.add('active');
+    } else {
+      el.classList.remove('active');
+    }
+  });
+}
+
+/**
+ * Render library items list.
+ */
+function renderLibraryItems() {
+  // Clear existing items
+  while (libraryItemsList.firstChild) {
+    libraryItemsList.removeChild(libraryItemsList.firstChild);
+  }
+
+  if (libraryItems.length === 0) {
+    const emptyState = document.createElement('p');
+    emptyState.className = 'empty-state';
+    emptyState.textContent = currentFolderId ? 'No items in this folder' : 'No items saved yet';
+    libraryItemsList.appendChild(emptyState);
+    return;
+  }
+
+  for (const item of libraryItems) {
+    const itemEl = document.createElement('div');
+    itemEl.className = 'library-item';
+    if (item.contentDeleted) {
+      itemEl.classList.add('library-item-deleted');
+    }
+    if (item.id === selectedItemId) {
+      itemEl.classList.add('selected');
+    }
+    itemEl.dataset.itemId = item.id;
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'library-item-icon';
+    iconSpan.textContent = item.source === 'pdf' ? '\u{1F4C4}' : item.source === 'text' ? '\u{1F4DD}' : '\u{1F310}';
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'library-item-info';
+
+    const titleSpan = document.createElement('div');
+    titleSpan.className = 'library-item-title';
+    titleSpan.textContent = item.title || 'Untitled';
+
+    const metaSpan = document.createElement('div');
+    metaSpan.className = 'library-item-meta';
+    const date = new Date(item.lastReadAt);
+    const sizeKb = Math.round(item.contentSize / 1024);
+    metaSpan.textContent = `${date.toLocaleDateString()} | ${sizeKb} KB`;
+
+    infoDiv.appendChild(titleSpan);
+    infoDiv.appendChild(metaSpan);
+
+    itemEl.appendChild(iconSpan);
+    itemEl.appendChild(infoDiv);
+
+    itemEl.addEventListener('click', () => selectItem(item.id));
+    libraryItemsList.appendChild(itemEl);
+  }
+}
+
+/**
+ * Select an item and show actions.
+ */
+function selectItem(itemId: string) {
+  selectedItemId = itemId;
+
+  // Update item selection UI
+  const itemEls = libraryItemsList.querySelectorAll('.library-item');
+  itemEls.forEach((el) => {
+    if ((el as HTMLElement).dataset.itemId === itemId) {
+      el.classList.add('selected');
+    } else {
+      el.classList.remove('selected');
+    }
+  });
+
+  // Show item actions
+  itemActions.classList.remove('hidden');
+
+  // Update move to folder select
+  const item = libraryItems.find((i) => i.id === itemId);
+  if (item) {
+    moveToFolderSelect.value = item.folderId || '';
+  }
+}
+
+/**
+ * Update move-to-folder select options.
+ */
+function updateMoveToFolderSelect() {
+  // Clear existing options (except first placeholder)
+  while (moveToFolderSelect.options.length > 1) {
+    moveToFolderSelect.remove(1);
+  }
+
+  // Add root option
+  const rootOption = document.createElement('option');
+  rootOption.value = '';
+  rootOption.textContent = 'Root (no folder)';
+  moveToFolderSelect.appendChild(rootOption);
+
+  // Add folders
+  for (const folder of folders) {
+    const option = document.createElement('option');
+    option.value = folder.id;
+    option.textContent = folder.name;
+    moveToFolderSelect.appendChild(option);
+  }
+}
+
+/**
+ * Handle create folder button click.
+ */
+async function handleCreateFolder() {
+  const name = newFolderInput.value.trim();
+  if (!name) return;
+
+  try {
+    const response = await sendToServiceWorker<{ success: boolean; folder: FolderData }>(
+      MessageType.FOLDER_CREATE,
+      { name }
+    );
+
+    if (response.success) {
+      newFolderInput.value = '';
+      await loadFolders();
+    }
+  } catch (error) {
+    console.error('Failed to create folder:', error);
+    showMessage('Failed to create folder', 'error');
+  }
+}
+
+/**
+ * Handle rename folder.
+ */
+async function handleRenameFolder(folderId: string, currentName: string) {
+  const newName = prompt('Enter new folder name:', currentName);
+  if (!newName || newName.trim() === currentName) return;
+
+  try {
+    await sendToServiceWorker(MessageType.FOLDER_RENAME, {
+      folderId,
+      name: newName.trim()
+    });
+    await loadFolders();
+  } catch (error) {
+    console.error('Failed to rename folder:', error);
+    showMessage('Failed to rename folder', 'error');
+  }
+}
+
+/**
+ * Handle delete folder.
+ */
+async function handleDeleteFolder(folderId: string) {
+  if (!confirm('Delete this folder? Items will be moved to root.')) return;
+
+  try {
+    await sendToServiceWorker(MessageType.FOLDER_DELETE, { folderId });
+
+    // If we were viewing this folder, switch to All Items
+    if (currentFolderId === folderId) {
+      currentFolderId = null;
+      updateFolderSelection();
+    }
+
+    await loadFolders();
+    await loadLibraryItems();
+  } catch (error) {
+    console.error('Failed to delete folder:', error);
+    showMessage('Failed to delete folder', 'error');
+  }
+}
+
+/**
+ * Handle play item button click.
+ */
+async function handlePlayItem() {
+  if (!selectedItemId) return;
+
+  const item = libraryItems.find((i) => i.id === selectedItemId);
+  if (!item) return;
+
+  if (item.contentDeleted) {
+    showMessage('Content was removed. Re-extract from original page.', 'error');
+    return;
+  }
+
+  try {
+    const response = await sendToServiceWorker<{
+      success: boolean;
+      content?: string;
+      item?: LibraryItemData;
+      error?: string;
+    }>(MessageType.PLAY_LIBRARY_ITEM, { itemId: selectedItemId });
+
+    if (!response.success) {
+      showMessage(response.error || 'Failed to load item', 'error');
+      return;
+    }
+
+    // Close library panel and load content into text input
+    closeLibraryPanel();
+
+    if (response.content) {
+      textInput.value = response.content;
+      currentDocumentTitle = item.title;
+      currentDocumentUrl = item.url;
+      isSavedToLibrary = true;
+      updateSaveButtonState();
+      updatePlayButtonState();
+      showMessage('Item loaded! Click Play to listen.', 'success');
+    }
+  } catch (error) {
+    console.error('Failed to play item:', error);
+    showMessage('Failed to load item', 'error');
+  }
+}
+
+/**
+ * Handle delete item button click.
+ */
+async function handleDeleteItem() {
+  if (!selectedItemId) return;
+
+  if (!confirm('Delete this item from library?')) return;
+
+  try {
+    await sendToServiceWorker(MessageType.DELETE_LIBRARY_ITEM, {
+      itemId: selectedItemId,
+      deleteContent: false // Full delete
+    });
+
+    selectedItemId = null;
+    itemActions.classList.add('hidden');
+    await loadLibraryItems();
+    showMessage('Item deleted', 'success');
+  } catch (error) {
+    console.error('Failed to delete item:', error);
+    showMessage('Failed to delete item', 'error');
+  }
+}
+
+/**
+ * Handle move item to folder.
+ */
+async function handleMoveItem() {
+  if (!selectedItemId) return;
+
+  const folderId = moveToFolderSelect.value || null;
+
+  try {
+    await sendToServiceWorker(MessageType.ITEM_MOVE_TO_FOLDER, {
+      itemId: selectedItemId,
+      folderId
+    });
+
+    // Reload items to reflect new folder assignment
+    await loadLibraryItems();
+    showMessage('Item moved', 'success');
+  } catch (error) {
+    console.error('Failed to move item:', error);
+    showMessage('Failed to move item', 'error');
+  }
+}
+
 // Initialize on load
 init();
