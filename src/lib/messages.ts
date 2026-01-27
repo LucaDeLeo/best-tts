@@ -41,6 +41,9 @@ export const MessageType = {
   // Content extraction
   EXTRACT_SELECTION: 'extract-selection',     // Get selected text
   EXTRACT_ARTICLE: 'extract-article',         // Full-page Readability extraction
+
+  // Highlighting
+  INIT_HIGHLIGHTING: 'init-highlighting',     // Initialize highlighting mode
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -105,6 +108,8 @@ export interface PlayAudioMessage extends BaseMessage {
   audioData: string;      // Base64-encoded audio data
   audioMimeType: string;  // e.g., 'audio/wav'
   generationToken: string;
+  chunkIndex: number;     // Index for highlighting
+  totalChunks: number;    // Total chunks for progress
 }
 
 export interface PauseAudioMessage extends BaseMessage {
@@ -172,6 +177,14 @@ export interface ExtractArticleMessage extends BaseMessage {
   type: typeof MessageType.EXTRACT_ARTICLE;
 }
 
+// Highlighting messages
+export interface InitHighlightingMessage extends BaseMessage {
+  type: typeof MessageType.INIT_HIGHLIGHTING;
+  mode: 'selection' | 'overlay';
+  text: string;
+  title?: string;
+}
+
 /**
  * Result returned from content extraction operations.
  * Used as sendResponse payload, not as a routable message.
@@ -207,7 +220,8 @@ export type TTSMessage =
   | TTSGenerateChunkMessage
   | ChunkReadyMessage
   | ExtractSelectionMessage
-  | ExtractArticleMessage;
+  | ExtractArticleMessage
+  | InitHighlightingMessage;
 
 // Response types
 export interface TTSResponse {
@@ -217,6 +231,10 @@ export interface TTSResponse {
 
 export interface VoiceListResponse extends TTSResponse {
   voices?: string[];
+}
+
+export interface InitHighlightingResponse extends TTSResponse {
+  chunks?: string[];
 }
 
 export interface StatusResponse extends TTSResponse {
