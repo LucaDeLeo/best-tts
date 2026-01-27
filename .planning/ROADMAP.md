@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - 🚧 **v1 Best TTS** Phases 1-8
 
 - [x] **Phase 1: TTS Engine** - Kokoro TTS running in browser via ONNX Runtime Web
-- [ ] **Phase 2: Basic Playback** - Play/pause, speed control, and keyboard shortcuts
+- [x] **Phase 2: Basic Playback** - Play/pause, speed control, and keyboard shortcuts
 - [ ] **Phase 3: Content Extraction** - Read selected text and full webpages
 - [ ] **Phase 4: Text Highlighting** - Sync text display with audio playback
 - [ ] **Phase 5: Floating Player** - Mini player UI on any webpage
@@ -59,13 +59,14 @@ Plans:
 **Plans**: 4 plans in 4 waves (sequential)
 
 Plans:
-- [ ] 02-01-PLAN.md — Message types and PlaybackState in service worker
-- [ ] 02-02-PLAN.md — Text chunking with Intl.Segmenter and chunk-based generation
-- [ ] 02-03-PLAN.md — Content script for audio playback with heartbeat
-- [ ] 02-04-PLAN.md — Popup UI with playback controls and keyboard shortcuts
+- [x] 02-01-PLAN.md — Message types and PlaybackState in service worker
+- [x] 02-02-PLAN.md — Text chunking with Intl.Segmenter and chunk-based generation
+- [x] 02-03-PLAN.md — Content script for audio playback with heartbeat
+- [x] 02-04-PLAN.md — Popup UI with playback controls and keyboard shortcuts
 
 **Research Flag**: Standard Web Audio patterns, skip research-phase
 **Context**: Completed (CONTEXT.md - architecture moved audio playback to content script)
+**Completed**: 2026-01-27
 
 ### Phase 3: Content Extraction
 **Goal**: User can read any webpage content aloud with intelligent text extraction
@@ -171,7 +172,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. TTS Engine | 4/4 | ✓ Complete | 2026-01-27 |
-| 2. Basic Playback | 0/4 | Planned | - |
+| 2. Basic Playback | 4/4 | ✓ Complete | 2026-01-27 |
 | 3. Content Extraction | 0/? | Not started | - |
 | 4. Text Highlighting | 0/? | Not started | - |
 | 5. Floating Player | 0/? | Not started | - |
@@ -181,4 +182,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27 — Phase 1 complete*
+*Last updated: 2026-01-27 — Phase 2 complete*
