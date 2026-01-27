@@ -44,6 +44,9 @@ export const MessageType = {
 
   // Highlighting
   INIT_HIGHLIGHTING: 'init-highlighting',     // Initialize highlighting mode
+
+  // Floating player control
+  SHOW_FLOATING_PLAYER: 'show-floating-player', // Restore dismissed floating player
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -185,6 +188,11 @@ export interface InitHighlightingMessage extends BaseMessage {
   title?: string;
 }
 
+// Floating player control messages
+export interface ShowFloatingPlayerMessage extends BaseMessage {
+  type: typeof MessageType.SHOW_FLOATING_PLAYER;
+}
+
 /**
  * Result returned from content extraction operations.
  * Used as sendResponse payload, not as a routable message.
@@ -221,7 +229,8 @@ export type TTSMessage =
   | ChunkReadyMessage
   | ExtractSelectionMessage
   | ExtractArticleMessage
-  | InitHighlightingMessage;
+  | InitHighlightingMessage
+  | ShowFloatingPlayerMessage;
 
 // Response types
 export interface TTSResponse {

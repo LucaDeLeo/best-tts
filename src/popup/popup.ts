@@ -36,6 +36,9 @@ const extractionStatus = document.getElementById('extraction-status')!;
 const extractionSource = document.getElementById('extraction-source')!;
 const clearExtractionBtn = document.getElementById('clear-extraction-btn') as HTMLButtonElement;
 
+// Show player button (restores dismissed floating player)
+const showPlayerBtn = document.getElementById('show-player-btn') as HTMLButtonElement;
+
 // Port for service worker communication (keeps SW alive during extraction)
 let extractionPort: chrome.runtime.Port | null = null;
 
@@ -68,6 +71,9 @@ async function init() {
   readPageBtn.addEventListener('click', handleReadPage);
   readSelectionBtn.addEventListener('click', handleReadSelection);
   clearExtractionBtn.addEventListener('click', clearExtraction);
+
+  // Show player button listener
+  showPlayerBtn.addEventListener('click', handleShowPlayer);
 
   // Check for pending extraction (from context menu OR popup that closed mid-extraction)
   await loadPendingExtraction();
@@ -314,6 +320,7 @@ function handlePlaybackComplete() {
   playBtn.classList.remove('loading');
   playBtn.classList.remove('hidden');
   pauseBtn.classList.add('hidden');
+  showPlayerBtn.classList.add('hidden'); // Hide "Show Player" when idle
   updatePlayButtonState();
   stopBtn.disabled = true;
   updateProgressUI();
@@ -527,6 +534,8 @@ function updateProgressUI() {
  * Update play/pause button UI
  */
 function updatePlayPauseUI() {
+  const hasActivePlayback = isPlaying || (totalChunks > 0 && currentChunkIndex < totalChunks);
+
   if (isPlaying) {
     playBtn.classList.add('hidden');
     pauseBtn.classList.remove('hidden');
@@ -546,6 +555,15 @@ function updatePlayPauseUI() {
     pauseBtn.classList.add('hidden');
     updatePlayButtonState();
   }
+
+  // Show "Show Player" button when playback is active (playing or paused)
+  // User may have dismissed the floating player and want to restore it
+  if (hasActivePlayback) {
+    showPlayerBtn.classList.remove('hidden');
+  } else {
+    showPlayerBtn.classList.add('hidden');
+  }
+
   updateProgressUI();
 }
 
@@ -605,6 +623,24 @@ async function sendToOffscreen<T>(
       }
     );
   });
+}
+
+/**
+ * Handle "Show Player" button - restores dismissed floating player.
+ * Sends SHOW_FLOATING_PLAYER message to content script.
+ */
+async function handleShowPlayer() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      await chrome.tabs.sendMessage(tab.id, {
+        target: 'content-script',
+        type: MessageType.SHOW_FLOATING_PLAYER
+      });
+    }
+  } catch {
+    // Content script might not be ready - silently ignore
+  }
 }
 
 /**

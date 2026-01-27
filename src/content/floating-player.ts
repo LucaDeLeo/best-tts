@@ -241,15 +241,27 @@ function createPlayerDOM(shadow: ShadowRoot): {
 }
 
 /**
+ * Options for createFloatingPlayer factory function.
+ */
+export interface FloatingPlayerOptions {
+  /** Callback invoked when user dismisses the player */
+  onDismiss?: () => void;
+}
+
+/**
  * Create the floating player Shadow DOM component.
  *
  * Returns a singleton instance - calling multiple times returns the same player.
  * Player starts hidden and becomes visible when update() is called with non-idle status.
+ *
+ * @param options.onDismiss - Called when user clicks dismiss button (player hides but playback continues)
  */
-export function createFloatingPlayer(): {
+export function createFloatingPlayer(options?: FloatingPlayerOptions): {
   update: (state: PlayerUIState) => void;
   destroy: () => void;
   isVisible: () => boolean;
+  show: () => void;
+  hide: () => void;
 } {
   // Return existing instance if already created
   if (playerInstance) {
@@ -282,22 +294,49 @@ export function createFloatingPlayer(): {
     dismissBtn
   } = createPlayerDOM(shadow);
 
-  // Track visibility
+  // Track visibility and dismissed state
   let isVisible = false;
+  let isHidden = false; // true when user explicitly dismissed
+
+  /**
+   * Show the player (if not idle).
+   * Called when user wants to restore a dismissed player.
+   */
+  function showPlayer(): void {
+    if (currentState.status !== 'idle') {
+      container.classList.remove('hidden');
+      isHidden = false;
+      isVisible = true;
+    }
+  }
+
+  /**
+   * Hide the player without stopping playback.
+   * Called when user dismisses the player.
+   */
+  function hidePlayer(): void {
+    container.classList.add('hidden');
+    isHidden = true;
+    isVisible = false;
+  }
 
   // Update function - renders state to UI and updates currentState
   function update(state: PlayerUIState): void {
     // Update cached state for button handlers
     currentState = { ...state };
 
-    // Show/hide based on status
+    // Auto-hide when idle (always hide on idle, and reset dismissed state)
     if (state.status === 'idle') {
       container.classList.add('hidden');
       isVisible = false;
-    } else {
+      // Note: isHidden is NOT reset here - that's handled by content-script
+      // when playback stops (so next playback shows player)
+    } else if (!isHidden) {
+      // Show only if not explicitly dismissed by user
       container.classList.remove('hidden');
       isVisible = true;
     }
+    // If isHidden is true and status != idle, player stays hidden (dismissed state)
 
     // Update play/pause button icon and label
     if (state.status === 'playing') {
@@ -364,13 +403,11 @@ export function createFloatingPlayer(): {
     sendPlaybackCommand(MessageType.SET_SPEED, { speed: nextSpeed });
   };
 
-  // Dismiss handler
+  // Dismiss handler - hides player without stopping playback
+  // Per CONTEXT.md decision [7]: full dismiss with popup restore affordance
   dismissBtn.onclick = () => {
-    sendPlaybackCommand(MessageType.STOP_PLAYBACK);
-    container.classList.add('hidden');
-    isVisible = false;
-    // Dispatch event for cleanup coordination
-    window.dispatchEvent(new CustomEvent('besttts-player-dismissed'));
+    hidePlayer();
+    options?.onDismiss?.();
   };
 
   // Add ARIA live region for screen reader announcements
@@ -414,9 +451,10 @@ export function createFloatingPlayer(): {
 
       case 'Escape':
         e.preventDefault();
-        // Dismiss player
-        sendPlaybackCommand(MessageType.STOP_PLAYBACK);
-        announce('Playback stopped');
+        // Dismiss player (hide without stopping playback)
+        hidePlayer();
+        options?.onDismiss?.();
+        announce('Player dismissed');
         break;
 
       case 'ArrowLeft':
@@ -480,7 +518,9 @@ export function createFloatingPlayer(): {
       hostElement = null;
       playerInstance = null;
     },
-    isVisible: () => isVisible
+    isVisible: () => isVisible,
+    show: showPlayer,
+    hide: hidePlayer
   };
 
   return playerInstance;
