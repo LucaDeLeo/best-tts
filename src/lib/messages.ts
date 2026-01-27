@@ -105,6 +105,7 @@ export const MessageType = {
   ITEM_MOVE_TO_FOLDER: 'item-move-to-folder',
   GET_LIBRARY_ITEMS: 'get-library-items',
   DELETE_LIBRARY_ITEM: 'delete-library-item',
+  GET_RECENT_ITEMS: 'get-recent-items',         // Get recent library items for popup
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -332,6 +333,11 @@ export interface DeleteLibraryItemMessage extends BaseMessage {
   deleteContent?: boolean;  // true = delete content only, keep metadata
 }
 
+export interface GetRecentItemsMessage extends BaseMessage {
+  type: typeof MessageType.GET_RECENT_ITEMS;
+  limit?: number;  // Default 5
+}
+
 /**
  * Result returned from content extraction operations.
  * Used as sendResponse payload, not as a routable message.
@@ -382,7 +388,8 @@ export type TTSMessage =
   | FolderListMessage
   | ItemMoveToFolderMessage
   | GetLibraryItemsMessage
-  | DeleteLibraryItemMessage;
+  | DeleteLibraryItemMessage
+  | GetRecentItemsMessage;
 
 // Response types
 export interface TTSResponse {
