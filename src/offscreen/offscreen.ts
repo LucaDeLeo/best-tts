@@ -7,6 +7,8 @@ import {
   type OffscreenExtractMessage,
   type DocumentExtractionResult,
   type DocumentType,
+  type VoicePreviewMessage,
+  type VoicePreviewResponse,
   EXTRACTION_THRESHOLDS,
 } from '../lib/messages';
 import { TTSEngine, type VoiceId } from '../lib/tts-engine';
@@ -308,6 +310,11 @@ async function handleMessage(message: OffscreenHandledMessage): Promise<TTSRespo
       return { success: true };
     }
 
+    case MessageType.VOICE_PREVIEW: {
+      const { voice } = message as VoicePreviewMessage;
+      return await handleVoicePreview(voice);
+    }
+
     default:
       return { success: false, error: `Unknown message type: ${(message as TTSMessage).type}` };
   }
@@ -491,6 +498,45 @@ async function handleGetStatus(): Promise<TTSResponse & { initialized: boolean }
     success: true,
     initialized: TTSEngine.isInitialized()
   };
+}
+
+/**
+ * Handle voice preview - generate short sample audio
+ * Per CONTEXT.md Decision #5: Fixed preview text, return audio data
+ */
+async function handleVoicePreview(voice: string): Promise<VoicePreviewResponse> {
+  try {
+    // Ensure TTS engine is initialized
+    if (!TTSEngine.isInitialized()) {
+      await TTSEngine.getInstance();
+    }
+
+    // Fixed preview text per CONTEXT.md
+    const voiceName = voice.split('_')[1] || voice;
+    const capitalizedName = voiceName.charAt(0).toUpperCase() + voiceName.slice(1);
+    const previewText = `This is the ${capitalizedName} voice.`;
+
+    // Generate audio
+    const audioBlob = await TTSEngine.generate(previewText, voice as VoiceId);
+
+    // Convert blob to base64 for cross-context transfer
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+
+    return {
+      success: true,
+      audioData: base64,
+      audioMimeType: audioBlob.type || 'audio/wav'
+    };
+  } catch (error) {
+    console.error('Voice preview generation failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Preview generation failed'
+    };
+  }
 }
 
 /**
