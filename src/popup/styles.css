@@ -404,7 +404,7 @@ select:focus {
 .extraction-status {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 8px 12px;
   background: #e8f4fd;
   border-radius: 4px;

@@ -10,6 +10,7 @@ import {
   type DocumentType,
   type DocumentExtractionResult,
   type PendingWarning,
+  type SaveToLibraryResponse,
 } from '../lib/messages';
 import { getSelectedVoice, setSelectedVoice } from '../lib/voice-storage';
 import { getDownloadProgress } from '../lib/model-cache';
@@ -67,6 +68,10 @@ const clearImportBtn = document.getElementById('clear-import-btn') as HTMLButton
 // Show player button (restores dismissed floating player)
 const showPlayerBtn = document.getElementById('show-player-btn') as HTMLButtonElement;
 
+// Save to Library buttons
+const saveToLibraryBtn = document.getElementById('save-to-library-btn') as HTMLButtonElement;
+const saveImportToLibraryBtn = document.getElementById('save-import-to-library-btn') as HTMLButtonElement;
+
 // Port for service worker communication (keeps SW alive during extraction)
 let extractionPort: chrome.runtime.Port | null = null;
 
@@ -84,6 +89,12 @@ let currentExtractionId: string | null = null;
 
 // Pending warning state (for extraction warnings like page count or text length)
 let pendingWarning: PendingWarning | null = null;
+
+// Library state
+let isSavedToLibrary = false;
+let savingToLibrary = false;
+let currentDocumentUrl: string | null = null;
+let currentDocumentTitle: string | null = null;
 
 /**
  * Initialize popup
@@ -117,6 +128,10 @@ async function init() {
 
   // Show player button listener
   showPlayerBtn.addEventListener('click', handleShowPlayer);
+
+  // Save to Library button listeners
+  saveToLibraryBtn.addEventListener('click', handleSaveToLibrary);
+  saveImportToLibraryBtn.addEventListener('click', handleSaveToLibrary);
 
   // Check for pending extraction (from context menu OR popup that closed mid-extraction)
   await loadPendingExtraction();
@@ -706,6 +721,96 @@ async function handleShowPlayer() {
 }
 
 /**
+ * Handle Save to Library button click.
+ * Saves current extracted content to the library.
+ */
+async function handleSaveToLibrary() {
+  const text = textInput.value.trim();
+  if (!text || savingToLibrary) return;
+
+  savingToLibrary = true;
+  updateSaveButtonState();
+
+  try {
+    // Determine source based on which section is visible
+    let source: 'webpage' | 'pdf' | 'text' = 'webpage';
+    if (!importStatus.classList.contains('hidden')) {
+      // Import status visible - it's a document
+      const filename = importSource.textContent || '';
+      source = filename.toLowerCase().endsWith('.pdf') ? 'pdf' : 'text';
+    }
+
+    const response = await sendToServiceWorker<SaveToLibraryResponse>(
+      MessageType.SAVE_TO_LIBRARY,
+      {
+        item: {
+          title: currentDocumentTitle || 'Untitled',
+          url: currentDocumentUrl || '',
+          source,
+          content: text
+        }
+      }
+    );
+
+    if (response.success) {
+      isSavedToLibrary = true;
+      if (response.alreadyExists) {
+        showMessage('Already in library', 'success');
+      } else {
+        showMessage('Saved to library!', 'success');
+      }
+      updateSaveButtonState();
+    } else {
+      showMessage(response.error || 'Failed to save', 'error');
+    }
+  } catch (error) {
+    console.error('Save to library failed:', error);
+    showMessage('Failed to save to library', 'error');
+  } finally {
+    savingToLibrary = false;
+    updateSaveButtonState();
+  }
+}
+
+/**
+ * Update Save to Library button states based on current state.
+ */
+function updateSaveButtonState() {
+  const text = savingToLibrary ? 'Saving...' : isSavedToLibrary ? 'Saved' : 'Save';
+  const disabled = savingToLibrary || isSavedToLibrary;
+
+  saveToLibraryBtn.textContent = text;
+  saveToLibraryBtn.disabled = disabled;
+  saveImportToLibraryBtn.textContent = text;
+  saveImportToLibraryBtn.disabled = disabled;
+}
+
+/**
+ * Check if URL is already saved in library.
+ */
+async function checkLibraryStatus(url: string) {
+  if (!url) {
+    isSavedToLibrary = false;
+    updateSaveButtonState();
+    return;
+  }
+
+  try {
+    const response = await sendToServiceWorker<{ success: boolean; isSaved: boolean; itemId?: string }>(
+      MessageType.GET_LIBRARY_STATUS,
+      { url }
+    );
+
+    if (response.success) {
+      isSavedToLibrary = response.isSaved;
+      updateSaveButtonState();
+    }
+  } catch (error) {
+    console.error('Failed to check library status:', error);
+  }
+}
+
+/**
  * Handle "Read This Page" button - extract article content
  */
 async function handleReadPage() {
@@ -895,6 +1000,14 @@ function showExtractionWarning(warning: PendingWarning) {
 function showExtractedContent(result: ExtractionResult) {
   if (!result.text) return;
 
+  // Store document info for library save
+  currentDocumentUrl = result.url || null;
+  currentDocumentTitle = result.title || null;
+
+  // Reset library state for new extraction
+  isSavedToLibrary = false;
+  updateSaveButtonState();
+
   // Populate text input with extracted content
   textInput.value = result.text;
   updatePlayButtonState();
@@ -908,6 +1021,11 @@ function showExtractedContent(result: ExtractionResult) {
   extractionSource.title = result.url || '';
   extractionStatus.classList.remove('hidden');
 
+  // Check if already in library
+  if (result.url) {
+    checkLibraryStatus(result.url);
+  }
+
   showMessage('Content extracted! Click Play to listen.', 'success');
 }
 
@@ -917,6 +1035,10 @@ function showExtractedContent(result: ExtractionResult) {
 function clearExtraction() {
   textInput.value = '';
   extractionStatus.classList.add('hidden');
+  currentDocumentUrl = null;
+  currentDocumentTitle = null;
+  isSavedToLibrary = false;
+  updateSaveButtonState();
   updatePlayButtonState();
   showMessage('Ready', 'success');
 }
@@ -1145,6 +1267,14 @@ function handleExtractionResult(result: DocumentExtractionResult, filename: stri
     return;
   }
 
+  // Store document info for library save
+  currentDocumentUrl = null; // No URL for imported files
+  currentDocumentTitle = filename;
+
+  // Reset library state for new import
+  isSavedToLibrary = false;
+  updateSaveButtonState();
+
   // Populate text input
   if (result.text) {
     textInput.value = result.text;
@@ -1180,6 +1310,10 @@ async function handleCancelImport() {
 function clearImport() {
   textInput.value = '';
   importStatus.classList.add('hidden');
+  currentDocumentUrl = null;
+  currentDocumentTitle = null;
+  isSavedToLibrary = false;
+  updateSaveButtonState();
   updatePlayButtonState();
   showMessage('Ready', 'success');
 }
