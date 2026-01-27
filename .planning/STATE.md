@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 2 - Basic Playback (COMPLETE)
+**Current focus:** Phase 3 - Content Extraction (In Progress)
 
 ## Current Position
 
-Phase: 2 of 8 (Basic Playback) - COMPLETE
-Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-01-27 - Completed 02-04-PLAN.md (Popup Playback Controls)
+Phase: 3 of 8 (Content Extraction)
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-01-27 - Completed 03-01-PLAN.md (Content Extraction Foundation)
 
-Progress: [########--] ~25% (8/~32 plans estimated)
+Progress: [#########-] ~28% (9/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 3.5 min
-- Total execution time: 28 min
+- Total plans completed: 9
+- Average duration: 3.3 min
+- Total execution time: 30 min
 
 **By Phase:**
 
@@ -29,9 +29,10 @@ Progress: [########--] ~25% (8/~32 plans estimated)
 |-------|-------|-------|----------|
 | 01-tts-engine | 4 | 16 min | 4 min |
 | 02-basic-playback | 4 | 12 min | 3 min |
+| 03-content-extraction | 1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 4 min, 2 min, 2 min, 3 min, 5 min
+- Last 5 plans: 2 min, 2 min, 3 min, 5 min, 2 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -67,6 +68,9 @@ Recent decisions affecting current work:
 - (02-04) Route TTS_GENERATE to service worker for proper playback orchestration
 - (02-04) Focus guard pattern: keyboard shortcuts disabled when textarea focused
 - (02-04) STATUS_UPDATE/AUDIO_ERROR message handling for UI synchronization
+- (03-01) Used @mozilla/readability (not @plumalab/readability which doesn't exist)
+- (03-01) MutationObserver for SPA stabilization: 300ms inactivity, 3s max wait
+- (03-01) MIN_CONTENT_LENGTH=100 chars for valid article extraction
 
 ### Pending Todos
 
@@ -81,9 +85,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T05:56:38Z
-Stopped at: Completed 02-04-PLAN.md (Popup Playback Controls) - Phase 2 complete
+Last session: 2026-01-27T06:41:14Z
+Stopped at: Completed 03-01-PLAN.md (Content Extraction Foundation)
 Resume file: None
 
 ---
-*Next action: Begin Phase 3 (Text Selection)*
+*Next action: Continue Phase 3 with 03-02 (Context Menu Integration)*
