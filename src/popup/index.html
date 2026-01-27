@@ -10,7 +10,12 @@
   <div class="container">
     <header>
       <h1>Best TTS</h1>
-      <span id="status-indicator" class="status-indicator"></span>
+      <div class="header-actions">
+        <button id="library-toggle-btn" class="btn-icon" title="Library">
+          <span class="icon">&#128218;</span>
+        </button>
+        <span id="status-indicator" class="status-indicator"></span>
+      </div>
     </header>
 
     <!-- Download Progress (shown during model download) -->
@@ -23,6 +28,15 @@
         <div id="progress-fill" class="progress-fill"></div>
       </div>
       <p id="progress-file" class="progress-file"></p>
+    </div>
+
+    <!-- Recent Items Section (shown when library has items) -->
+    <div id="recent-section" class="recent-section hidden">
+      <div class="recent-header">
+        <span class="recent-title">Recent</span>
+        <button id="view-all-btn" class="text-btn">View All</button>
+      </div>
+      <ul id="recent-list" class="recent-list"></ul>
     </div>
 
     <!-- Main Controls (shown when ready) -->
@@ -155,6 +169,45 @@
 
       <!-- Status Messages -->
       <p id="message" class="message"></p>
+    </div>
+
+    <!-- Library Panel (Phase 7) -->
+    <div id="library-section" class="library-section hidden">
+      <div class="library-header">
+        <button id="library-back-btn" class="btn-icon" title="Back to player">
+          <span class="icon">&#8592;</span>
+        </button>
+        <h2>Library</h2>
+      </div>
+
+      <!-- Folder List -->
+      <div class="library-folders">
+        <div class="folder-item active" data-folder-id="root">
+          <span class="folder-icon">&#128193;</span>
+          <span class="folder-name">All Items</span>
+        </div>
+        <div id="folder-list"></div>
+        <div class="folder-actions">
+          <input type="text" id="new-folder-input" placeholder="New folder name..." class="folder-input">
+          <button id="create-folder-btn" class="btn secondary small">Create</button>
+        </div>
+      </div>
+
+      <!-- Library Items List -->
+      <div class="library-items">
+        <div id="library-items-list" class="items-list">
+          <p class="empty-state">No items saved yet</p>
+        </div>
+      </div>
+
+      <!-- Item Actions (shown when item selected) -->
+      <div id="item-actions" class="item-actions hidden">
+        <select id="move-to-folder-select" class="folder-select">
+          <option value="">Move to folder...</option>
+        </select>
+        <button id="play-item-btn" class="btn primary small">Play</button>
+        <button id="delete-item-btn" class="btn secondary small">Delete</button>
+      </div>
     </div>
 
     <!-- Error State -->

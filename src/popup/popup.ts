@@ -15,6 +15,7 @@ import {
 import { getSelectedVoice, setSelectedVoice } from '../lib/voice-storage';
 import { getDownloadProgress } from '../lib/model-cache';
 import type { VoiceId } from '../lib/tts-engine';
+import type { LibraryItem } from '../lib/library-types';
 
 // DOM Elements
 const statusIndicator = document.getElementById('status-indicator')!;
@@ -72,6 +73,24 @@ const showPlayerBtn = document.getElementById('show-player-btn') as HTMLButtonEl
 const saveToLibraryBtn = document.getElementById('save-to-library-btn') as HTMLButtonElement;
 const saveImportToLibraryBtn = document.getElementById('save-import-to-library-btn') as HTMLButtonElement;
 
+// Recent Items elements
+const recentSection = document.getElementById('recent-section')!;
+const recentList = document.getElementById('recent-list')!;
+const viewAllBtn = document.getElementById('view-all-btn') as HTMLButtonElement;
+
+// Library Panel elements
+const librarySection = document.getElementById('library-section')!;
+const libraryToggleBtn = document.getElementById('library-toggle-btn') as HTMLButtonElement;
+const libraryBackBtn = document.getElementById('library-back-btn') as HTMLButtonElement;
+const folderList = document.getElementById('folder-list')!;
+const newFolderInput = document.getElementById('new-folder-input') as HTMLInputElement;
+const createFolderBtn = document.getElementById('create-folder-btn') as HTMLButtonElement;
+const libraryItemsList = document.getElementById('library-items-list')!;
+const itemActions = document.getElementById('item-actions')!;
+const moveToFolderSelect = document.getElementById('move-to-folder-select') as HTMLSelectElement;
+const playItemBtn = document.getElementById('play-item-btn') as HTMLButtonElement;
+const deleteItemBtn = document.getElementById('delete-item-btn') as HTMLButtonElement;
+
 // Port for service worker communication (keeps SW alive during extraction)
 let extractionPort: chrome.runtime.Port | null = null;
 
@@ -95,6 +114,30 @@ let isSavedToLibrary = false;
 let savingToLibrary = false;
 let currentDocumentUrl: string | null = null;
 let currentDocumentTitle: string | null = null;
+
+// Library panel state
+let libraryPanelOpen = false;
+let currentFolderId: string | null = null;  // null = 'All Items' (root)
+let selectedItemId: string | null = null;
+interface LibraryItemData {
+  id: string;
+  title: string;
+  url: string;
+  source: 'webpage' | 'pdf' | 'text';
+  folderId: string | null;
+  createdAt: number;
+  lastReadAt: number;
+  contentDeleted: boolean;
+  contentSize: number;
+}
+interface FolderData {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+let libraryItems: LibraryItemData[] = [];
+let folders: FolderData[] = [];
 
 /**
  * Initialize popup
@@ -132,6 +175,23 @@ async function init() {
   // Save to Library button listeners
   saveToLibraryBtn.addEventListener('click', handleSaveToLibrary);
   saveImportToLibraryBtn.addEventListener('click', handleSaveToLibrary);
+
+  // Recent items listeners
+  viewAllBtn.addEventListener('click', toggleLibraryPanel);
+
+  // Library panel listeners
+  libraryToggleBtn.addEventListener('click', toggleLibraryPanel);
+  libraryBackBtn.addEventListener('click', closeLibraryPanel);
+  createFolderBtn.addEventListener('click', handleCreateFolder);
+  newFolderInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleCreateFolder();
+  });
+  playItemBtn.addEventListener('click', handlePlayItem);
+  deleteItemBtn.addEventListener('click', handleDeleteItem);
+  moveToFolderSelect.addEventListener('change', handleMoveItem);
+
+  // Load recent library items
+  await loadRecentItems();
 
   // Check for pending extraction (from context menu OR popup that closed mid-extraction)
   await loadPendingExtraction();
@@ -1325,6 +1385,166 @@ function hideImportProgress() {
   importProgress.classList.add('hidden');
   importFileBtn.disabled = false;
   currentExtractionId = null;
+}
+
+// ============================================================================
+// Recent Items Functions
+// ============================================================================
+
+/**
+ * Load recent items from library.
+ */
+async function loadRecentItems() {
+  try {
+    const response = await sendToServiceWorker<{ success: boolean; items: LibraryItem[] }>(
+      MessageType.GET_RECENT_ITEMS,
+      { limit: 5 }
+    );
+
+    if (!response.success || !response.items || response.items.length === 0) {
+      recentSection.classList.add('hidden');
+      return;
+    }
+
+    recentSection.classList.remove('hidden');
+    renderRecentItems(response.items);
+  } catch (error) {
+    console.error('Failed to load recent items:', error);
+    recentSection.classList.add('hidden');
+  }
+}
+
+/**
+ * Render recent items list using safe DOM methods.
+ */
+function renderRecentItems(items: LibraryItem[]) {
+  // Clear list safely
+  while (recentList.firstChild) {
+    recentList.removeChild(recentList.firstChild);
+  }
+
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.className = 'recent-item';
+    if (item.contentDeleted) {
+      li.classList.add('content-deleted');
+    }
+
+    const progress = calculateItemProgress(item);
+
+    // Build inner content using safe DOM methods
+    const content = document.createElement('div');
+    content.className = 'recent-item-content';
+
+    const title = document.createElement('div');
+    title.className = 'recent-item-title';
+    title.textContent = item.title;
+    title.title = item.title;
+    content.appendChild(title);
+
+    const source = document.createElement('div');
+    source.className = 'recent-item-source';
+    source.textContent = item.source;
+    content.appendChild(source);
+
+    li.appendChild(content);
+
+    // Add progress indicator if available
+    if (progress !== null) {
+      const progressDiv = document.createElement('div');
+      progressDiv.className = 'recent-item-progress';
+
+      const ring = document.createElement('div');
+      ring.className = 'progress-ring';
+
+      const circle = document.createElement('div');
+      circle.className = 'progress-ring-circle';
+      circle.style.setProperty('--progress', `${progress}%`);
+      ring.appendChild(circle);
+      progressDiv.appendChild(ring);
+
+      const progressText = document.createElement('span');
+      progressText.className = 'progress-text';
+      progressText.textContent = `${progress}%`;
+      progressDiv.appendChild(progressText);
+
+      li.appendChild(progressDiv);
+    }
+
+    // Add deleted badge if content was deleted
+    if (item.contentDeleted) {
+      const badge = document.createElement('span');
+      badge.className = 'deleted-badge';
+      badge.textContent = 'Re-extract';
+      li.appendChild(badge);
+    }
+
+    // Click handler - play if not deleted
+    if (!item.contentDeleted) {
+      li.addEventListener('click', () => playRecentItem(item.id));
+    }
+
+    recentList.appendChild(li);
+  }
+}
+
+/**
+ * Calculate reading progress percentage for a library item.
+ */
+function calculateItemProgress(item: LibraryItem): number | null {
+  if (!item.resumeData) return null;
+
+  const { contentLength, charOffset } = item.resumeData;
+  if (contentLength && charOffset) {
+    return Math.round((charOffset / contentLength) * 100);
+  }
+  return null;
+}
+
+/**
+ * Play a recent library item.
+ */
+async function playRecentItem(itemId: string) {
+  try {
+    const response = await sendToServiceWorker<{
+      success: boolean;
+      error?: string;
+      item: LibraryItem;
+      content: string;
+      startChunkIndex?: number;
+    }>(MessageType.PLAY_LIBRARY_ITEM, { itemId });
+
+    if (!response.success) {
+      showMessage(response.error || 'Failed to load item', 'error');
+      return;
+    }
+
+    // Update document info
+    currentDocumentUrl = response.item.url;
+    currentDocumentTitle = response.item.title;
+    isSavedToLibrary = true; // It's from library
+    updateSaveButtonState();
+
+    // Populate text input
+    textInput.value = response.content;
+    updatePlayButtonState();
+
+    // Show extraction status
+    extractionSource.textContent = `Library: ${response.item.title}`;
+    extractionSource.title = response.item.url || '';
+    extractionStatus.classList.remove('hidden');
+
+    // Start playback if we have content
+    if (response.content && isInitialized) {
+      // If there's a resume position, we could skip to that chunk
+      // For now, just auto-play from the beginning/resume position
+      showMessage(`Playing: ${response.item.title}`, 'success');
+      handlePlay();
+    }
+  } catch (error) {
+    console.error('Failed to play recent item:', error);
+    showMessage('Failed to play item', 'error');
+  }
 }
 
 // Initialize on load
