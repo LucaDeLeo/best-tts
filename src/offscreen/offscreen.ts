@@ -6,12 +6,14 @@ import {
   type TTSGenerateChunkMessage,
   type OffscreenExtractMessage,
   type DocumentExtractionResult,
+  EXTRACTION_THRESHOLDS,
 } from '../lib/messages';
 import { TTSEngine, type VoiceId } from '../lib/tts-engine';
 import { setDownloadProgress, clearDownloadProgress, setCacheStatus } from '../lib/model-cache';
 import { getSelectedVoice } from '../lib/voice-storage';
 import { splitIntoChunks } from '../lib/text-chunker';
 import { extractTextFile } from '../lib/text-file-extractor';
+import { extractPdfText } from '../lib/pdf-extractor';
 
 console.log('Best TTS offscreen document loaded');
 
@@ -276,13 +278,50 @@ async function handleExtractDocument(msg: OffscreenExtractMessage): Promise<Docu
 
   try {
     switch (documentType) {
-      case 'pdf':
-        // Implemented in 06-02-PLAN.md
+      case 'pdf': {
+        // Per CONTEXT.md Decision #6: Page count warning triggers EARLY after metadata load.
+        // The onPageCountWarning callback pauses extraction and returns to SW for user confirmation.
+        const pdfResult = await extractPdfText(data, {
+          onProgress: (progress) => {
+            // Broadcast progress to popup
+            chrome.runtime.sendMessage({
+              target: 'popup',
+              type: MessageType.EXTRACTION_PROGRESS,
+              extractionId,
+              progress: Math.round((progress.current / progress.total) * 100),
+              stage: progress.stage
+            }).catch(() => {
+              // Popup might be closed
+            });
+          },
+          // signal passed from 06-05 (cancellation support)
+          pageCountThreshold: EXTRACTION_THRESHOLDS.PAGE_COUNT,
+          onPageCountWarning: async (pageCount, threshold) => {
+            // Notify service worker of page count warning
+            // SW will handle user confirmation and respond
+            const response = await chrome.runtime.sendMessage({
+              target: 'service-worker',
+              type: MessageType.PAGE_COUNT_WARNING,
+              extractionId,
+              pageCount,
+              threshold
+            }) as { continue: boolean };
+
+            return response.continue;
+          }
+        });
+
         return {
-          success: false,
-          error: 'PDF extraction not yet implemented',
-          extractionId
+          success: pdfResult.success,
+          text: pdfResult.text,
+          title: pdfResult.title || filename,
+          pageCount: pdfResult.pageCount,
+          textLength: pdfResult.textLength,
+          error: pdfResult.error,
+          extractionId,
+          pausedForPageCountWarning: pdfResult.pausedForPageCountWarning
         };
+      }
 
       case 'txt':
       case 'md': {

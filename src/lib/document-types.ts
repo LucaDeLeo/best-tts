@@ -115,6 +115,8 @@ export interface DocumentExtractionResult {
   textLength?: number;
   error?: string;
   extractionId: string;
+  /** Set when extraction paused for page count warning (early pause per CONTEXT Decision #6) */
+  pausedForPageCountWarning?: boolean;
 }
 
 /**
