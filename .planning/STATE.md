@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 6 - Document Support (In Progress)
+**Current focus:** Phase 6 - Document Support (Complete)
 
 ## Current Position
 
 Phase: 6 of 8 (Document Support)
-Plan: 4 of 5 in current phase
-Status: In progress
-Last activity: 2026-01-27 - Completed 06-04-PLAN.md (Popup Import UI)
+Plan: 5 of 5 in current phase (COMPLETE)
+Status: Phase complete
+Last activity: 2026-01-27 - Completed 06-05-PLAN.md (Service Worker & Warnings)
 
-Progress: [###########################] ~81% (26/~32 plans estimated)
+Progress: [############################] ~84% (27/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 26
-- Average duration: 2.69 min
-- Total execution time: 70 min
+- Total plans completed: 27
+- Average duration: 2.67 min
+- Total execution time: 72 min
 
 **By Phase:**
 
@@ -32,10 +32,10 @@ Progress: [###########################] ~81% (26/~32 plans estimated)
 | 03-content-extraction | 4 | 9 min | 2.25 min |
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
 | 05-floating-player | 5 | 12 min | 2.4 min |
-| 06-document-support | 4 | 9 min | 2.25 min |
+| 06-document-support | 5 | 11 min | 2.2 min |
 
 **Recent Trend:**
-- Last 5 plans: 3 min, 3 min, 4 min, 2 min, 3 min
+- Last 5 plans: 3 min, 4 min, 2 min, 3 min, 3 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -130,6 +130,10 @@ Recent decisions affecting current work:
 - (06-04) File size checked via file.size BEFORE file.arrayBuffer() to avoid memory allocation
 - (06-04) Chunked upload uses file.slice() for files > 10 MB per CONTEXT.md Decision #2
 - (06-04) Progress UI shows upload phase (0-50%) and extraction phase (50-100%)
+- (06-05) Chunk storage in offscreen IndexedDB, not SW memory (per CONTEXT.md Decision #2)
+- (06-05) Promise resolver pattern for early page count warnings
+- (06-05) 5-minute timeout auto-cancels pending warnings
+- (06-05) WARNING_RESPONSE handles both page count and text length warnings
 
 ### Pending Todos
 
@@ -144,9 +148,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T10:18:18Z
-Stopped at: Completed 06-04-PLAN.md (Popup Import UI)
+Last session: 2026-01-27T10:25:00Z
+Stopped at: Completed 06-05-PLAN.md (Service Worker & Warnings)
 Resume file: None
 
 ---
-*Next action: Continue with 06-05-PLAN.md (Cancellation and Warnings)*
+*Next action: Begin Phase 7 - Library Storage*
