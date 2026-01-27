@@ -52,6 +52,12 @@ async function handleMessage(message: any): Promise<any> {
     case MessageType.SET_SPEED:
       return handleSetSpeed(message as SetSpeedMessage);
 
+    case MessageType.EXTRACT_SELECTION:
+      return handleExtractSelection();
+
+    case MessageType.EXTRACT_ARTICLE:
+      return handleExtractArticle();
+
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };
   }
@@ -151,6 +157,73 @@ async function handleSetSpeed(msg: SetSpeedMessage): Promise<{ success: boolean 
     currentAudio.playbackRate = currentSpeed;
   }
   return { success: true };
+}
+
+/**
+ * Handle selection extraction request
+ * Returns selected text with page metadata
+ */
+async function handleExtractSelection(): Promise<ExtractionResult> {
+  const text = getSelectedText();
+
+  if (!text) {
+    return {
+      success: false,
+      error: 'No text selected. Select some text and try again.',
+      source: 'selection'
+    };
+  }
+
+  return {
+    success: true,
+    text,
+    title: document.title,
+    url: window.location.href,
+    source: 'selection'
+  };
+}
+
+/**
+ * Handle full-page article extraction
+ * Uses Readability with SPA stabilization (see CONTEXT.md)
+ * Has internal 10s timeout to prevent hanging per MV3 30s limit
+ */
+async function handleExtractArticle(): Promise<ExtractionResult> {
+  const EXTRACTION_TIMEOUT = 10000; // 10 seconds
+
+  try {
+    // Race extraction against timeout
+    const result = await Promise.race([
+      extractArticle(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Extraction timed out')), EXTRACTION_TIMEOUT)
+      )
+    ]);
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error || 'Could not extract article content',
+        url: result.url,
+        source: 'article'
+      };
+    }
+
+    return {
+      success: true,
+      text: result.content,
+      title: result.title,
+      url: result.url,
+      source: 'article'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Extraction failed',
+      url: window.location.href,
+      source: 'article'
+    };
+  }
 }
 
 function startHeartbeat(): void {
