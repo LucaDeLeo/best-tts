@@ -106,6 +106,10 @@ export const MessageType = {
   GET_LIBRARY_ITEMS: 'get-library-items',
   DELETE_LIBRARY_ITEM: 'delete-library-item',
   GET_RECENT_ITEMS: 'get-recent-items',         // Get recent library items for popup
+
+  // Settings (Phase 8)
+  GET_SETTINGS: 'get-settings',
+  UPDATE_SETTINGS: 'update-settings',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -346,6 +350,16 @@ export interface GetRecentItemsMessage extends BaseMessage {
   limit?: number;  // Default 5
 }
 
+// Settings messages (Phase 8)
+export interface GetSettingsMessage extends BaseMessage {
+  type: typeof MessageType.GET_SETTINGS;
+}
+
+export interface UpdateSettingsMessage extends BaseMessage {
+  type: typeof MessageType.UPDATE_SETTINGS;
+  updates: Partial<import('./settings-storage').Settings>;
+}
+
 /**
  * Result returned from content extraction operations.
  * Used as sendResponse payload, not as a routable message.
@@ -397,7 +411,9 @@ export type TTSMessage =
   | ItemMoveToFolderMessage
   | GetLibraryItemsMessage
   | DeleteLibraryItemMessage
-  | GetRecentItemsMessage;
+  | GetRecentItemsMessage
+  | GetSettingsMessage
+  | UpdateSettingsMessage;
 
 // Response types
 export interface TTSResponse {
