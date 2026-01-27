@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Floating Player** - Mini player UI on any webpage
 - [x] **Phase 6: Document Support** - Import and read PDFs and text files
 - [x] **Phase 7: Library** - Save, organize, and resume documents
-- [ ] **Phase 8: Side Panel & Polish** - Full UI, settings, dark mode
+- [x] **Phase 8: Side Panel & Polish** - Full UI, settings, dark mode
 
 ## Phase Details
 
@@ -183,12 +183,20 @@ Plans:
   2. Dark mode is available and setting persists
   3. Settings page allows configuration of voice, speed, and shortcuts
   4. Voice selection UI shows all available voices with preview option
-**Plans**: TBD
+**Plans**: 7 plans in 3 waves
 
 Plans:
-- [ ] 08-01: TBD
+- [x] 08-01-PLAN.md — Side panel infrastructure (manifest, build, entry files)
+- [x] 08-02-PLAN.md — Shared CSS architecture with theme variables
+- [x] 08-03-PLAN.md — Settings storage consolidation with migration
+- [x] 08-04-PLAN.md — Side panel library tab (full library, folder management)
+- [x] 08-05-PLAN.md — Side panel settings tab (voice, speed, theme, shortcuts)
+- [x] 08-06-PLAN.md — Voice preview feature (audio playback in side panel)
+- [x] 08-07-PLAN.md — Popup enhancement (side panel button, theme support)
 
 **Research Flag**: Standard settings UI patterns, skip research-phase
+**Context**: Completed (CONTEXT.md - side panel API, settings consolidation, voice preview)
+**Completed**: 2026-01-27
 
 ## Progress
 
@@ -204,8 +212,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 5. Floating Player | 5/5 | ✓ Complete | 2026-01-27 |
 | 6. Document Support | 5/5 | ✓ Complete | 2026-01-27 |
 | 7. Library | 5/5 | ✓ Complete | 2026-01-27 |
-| 8. Side Panel & Polish | 0/? | Not started | - |
+| 8. Side Panel & Polish | 7/7 | ✓ Complete | 2026-01-27 |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27 — Phase 7 complete*
+*Last updated: 2026-01-27 — v1 Best TTS Complete (All 8 phases)*
