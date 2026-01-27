@@ -338,12 +338,19 @@ async function handleServiceWorkerMessage(
       case MessageType.TTS_GENERATE: {
         // Handle TTS_GENERATE directly to integrate highlighting
         // Per Phase 4: Initialize highlighting in content script, get chunks back
-        const { text, voice } = message as TTSGenerateMessage;
+        const { text, voice, libraryItemId, libraryContentHash, libraryContentLength } = message as TTSGenerateMessage;
 
         if (!text || text.trim().length === 0) {
           sendResponse({ success: false, error: 'Text cannot be empty' });
           break;
         }
+
+        // Library context for autosave
+        const libraryContext = libraryItemId ? {
+          libraryItemId,
+          libraryContentHash: libraryContentHash || null,
+          libraryContentLength: libraryContentLength || null
+        } : null;
 
         // Get active tab for highlighting initialization
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -355,7 +362,7 @@ async function handleServiceWorkerMessage(
             sendResponse({ success: false, error: 'No valid sentences found in text' });
             break;
           }
-          await startPlaybackWithChunks(fallbackChunks, voice, null, sendResponse);
+          await startPlaybackWithChunks(fallbackChunks, voice, null, sendResponse, libraryContext);
           break;
         }
 
@@ -390,12 +397,12 @@ async function handleServiceWorkerMessage(
               sendResponse({ success: false, error: 'No valid sentences found in text' });
               break;
             }
-            await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse);
+            await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse, libraryContext);
             break;
           }
 
           // Use chunks from highlighting (guaranteed DOM alignment)
-          await startPlaybackWithChunks(highlightResult.chunks, voice, tab.id, sendResponse);
+          await startPlaybackWithChunks(highlightResult.chunks, voice, tab.id, sendResponse, libraryContext);
         } catch (error) {
           // Content script error (not injected, etc.) - fallback
           console.warn('Could not communicate with content script:', error);
@@ -404,7 +411,7 @@ async function handleServiceWorkerMessage(
             sendResponse({ success: false, error: 'No valid sentences found in text' });
             break;
           }
-          await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse);
+          await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse, libraryContext);
         }
         break;
       }
@@ -845,7 +852,11 @@ async function playChunk(chunkIndex: number): Promise<void> {
       audioMimeType: result.audioMimeType,   // MIME type for blob creation
       generationToken: state.generationToken,
       chunkIndex: chunkIndex,                // Index for highlighting
-      totalChunks: state.totalChunks         // Total chunks for progress
+      totalChunks: state.totalChunks,        // Total chunks for progress
+      // Library context for autosave (Phase 7)
+      libraryItemId: state.libraryItemId,
+      libraryContentHash: state.libraryContentHash,
+      libraryContentLength: state.libraryContentLength
     });
 
     if (response.success) {
@@ -904,6 +915,15 @@ async function generateChunk(
 void generateChunk;
 
 /**
+ * Library context for autosave tracking
+ */
+interface LibraryContext {
+  libraryItemId: string;
+  libraryContentHash: string | null;
+  libraryContentLength: number | null;
+}
+
+/**
  * Initialize playback state with chunks and start playing first chunk.
  * Used by TTS_GENERATE handler after getting chunks from highlighting or fallback.
  */
@@ -911,7 +931,8 @@ async function startPlaybackWithChunks(
   chunks: string[],
   voice: string,
   tabId: number | null,
-  sendResponse: (response: TTSResponse & { generationToken?: string; chunks?: string[] }) => void
+  sendResponse: (response: TTSResponse & { generationToken?: string; chunks?: string[] }) => void,
+  libraryContext?: LibraryContext | null
 ): Promise<void> {
   const token = generateToken();
 
@@ -921,10 +942,14 @@ async function startPlaybackWithChunks(
     chunks,
     totalChunks: chunks.length,
     currentChunkIndex: 0,
-    activeTabId: tabId
+    activeTabId: tabId,
+    // Store library context for autosave (Phase 7)
+    libraryItemId: libraryContext?.libraryItemId || null,
+    libraryContentHash: libraryContext?.libraryContentHash || null,
+    libraryContentLength: libraryContext?.libraryContentLength || null
   });
 
-  console.log(`Starting playback with ${chunks.length} chunks, token ${token}`);
+  console.log(`Starting playback with ${chunks.length} chunks, token ${token}${libraryContext?.libraryItemId ? ` (library: ${libraryContext.libraryItemId})` : ''}`);
 
   // Start playing first chunk asynchronously
   playChunk(0).catch(console.error);

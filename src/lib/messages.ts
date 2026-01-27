@@ -125,6 +125,10 @@ export interface TTSGenerateMessage extends BaseMessage {
   type: typeof MessageType.TTS_GENERATE;
   text: string;
   voice: string;
+  // Library context for autosave (Phase 7)
+  libraryItemId?: string;
+  libraryContentHash?: string;
+  libraryContentLength?: number;
 }
 
 export interface TTSStopMessage extends BaseMessage {
@@ -172,6 +176,10 @@ export interface PlayAudioMessage extends BaseMessage {
   generationToken: string;
   chunkIndex: number;     // Index for highlighting
   totalChunks: number;    // Total chunks for progress
+  // Library context for autosave (Phase 7)
+  libraryItemId?: string;
+  libraryContentHash?: string;
+  libraryContentLength?: number;
 }
 
 export interface PauseAudioMessage extends BaseMessage {

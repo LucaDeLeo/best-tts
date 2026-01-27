@@ -105,11 +105,17 @@ async function handleMessage(message: any): Promise<any> {
 }
 
 async function handlePlayAudio(msg: PlayAudioMessage): Promise<{ success: boolean; error?: string }> {
-  const { audioData, audioMimeType, generationToken, chunkIndex, totalChunks } = msg;
+  const { audioData, audioMimeType, generationToken, chunkIndex, totalChunks, libraryItemId, libraryContentHash, libraryContentLength } = msg;
 
   // Track chunk info for floating player
   currentChunkIndex = chunkIndex;
   currentTotalChunks = totalChunks;
+
+  // Initialize library context for autosave (Phase 7)
+  // Only set up on first chunk (chunkIndex === 0) to avoid re-init on each chunk
+  if (libraryItemId && chunkIndex === 0) {
+    startLibraryPlayback(libraryItemId, libraryContentHash || '', libraryContentLength || 0, []);
+  }
 
   // Initialize floating player if not exists
   if (!floatingPlayer) {

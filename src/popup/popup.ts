@@ -114,6 +114,10 @@ let isSavedToLibrary = false;
 let savingToLibrary = false;
 let currentDocumentUrl: string | null = null;
 let currentDocumentTitle: string | null = null;
+// Library context for autosave (Phase 7)
+let currentLibraryItemId: string | null = null;
+let currentLibraryContentHash: string | null = null;
+let currentLibraryContentLength: number | null = null;
 
 // Library panel state
 let libraryPanelOpen = false;
@@ -414,7 +418,14 @@ async function handlePlay() {
     // then forward TTS_GENERATE_CHUNK to offscreen and PLAY_AUDIO to content script
     const response = await sendToServiceWorker<TTSResponse>(
       MessageType.TTS_GENERATE,
-      { text, voice: voiceSelect.value }
+      {
+        text,
+        voice: voiceSelect.value,
+        // Include library context for autosave (Phase 7)
+        libraryItemId: currentLibraryItemId || undefined,
+        libraryContentHash: currentLibraryContentHash || undefined,
+        libraryContentLength: currentLibraryContentLength || undefined
+      }
     );
 
     if (!response.success) {
@@ -462,6 +473,10 @@ function handlePlaybackComplete() {
   stopBtn.disabled = true;
   updateProgressUI();
   showMessage('Ready', 'success');
+  // Clear library context (Phase 7)
+  currentLibraryItemId = null;
+  currentLibraryContentHash = null;
+  currentLibraryContentLength = null;
 }
 
 /**
@@ -1511,6 +1526,7 @@ async function playRecentItem(itemId: string) {
       error?: string;
       item: LibraryItem;
       content: string;
+      contentHash?: string;
       startChunkIndex?: number;
     }>(MessageType.PLAY_LIBRARY_ITEM, { itemId });
 
@@ -1524,6 +1540,11 @@ async function playRecentItem(itemId: string) {
     currentDocumentTitle = response.item.title;
     isSavedToLibrary = true; // It's from library
     updateSaveButtonState();
+
+    // Set library context for autosave (Phase 7)
+    currentLibraryItemId = itemId;
+    currentLibraryContentHash = response.contentHash || response.item.contentHash;
+    currentLibraryContentLength = response.content.length;
 
     // Populate text input
     textInput.value = response.content;
