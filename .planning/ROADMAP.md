@@ -77,12 +77,16 @@ Plans:
   2. Extension extracts article content from webpages (bypassing ads, navigation)
   3. Reader mode extraction works on major news/blog sites
   4. Extraction fails gracefully with user-friendly message on complex pages
-**Plans**: TBD
+**Plans**: 4 plans in 4 waves (sequential)
 
 Plans:
-- [ ] 03-01: TBD
+- [ ] 03-01-PLAN.md — Readability dependency and content extractor module
+- [ ] 03-02-PLAN.md — Context menu integration and service worker handlers
+- [ ] 03-03-PLAN.md — Content script extraction message handlers
+- [ ] 03-04-PLAN.md — Popup integration with extraction UI
 
 **Research Flag**: Standard Readability patterns, skip research-phase
+**Context**: Completed (CONTEXT.md - context menu for full-page, SPA stabilization strategy)
 
 ### Phase 4: Text Highlighting
 **Goal**: User sees text highlighted in sync with audio for easy reading
@@ -173,7 +177,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 |-------|----------------|--------|-----------|
 | 1. TTS Engine | 4/4 | ✓ Complete | 2026-01-27 |
 | 2. Basic Playback | 4/4 | ✓ Complete | 2026-01-27 |
-| 3. Content Extraction | 0/? | Not started | - |
+| 3. Content Extraction | 0/4 | Planned | - |
 | 4. Text Highlighting | 0/? | Not started | - |
 | 5. Floating Player | 0/? | Not started | - |
 | 6. Document Support | 0/? | Not started | - |
@@ -182,4 +186,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27 — Phase 2 complete*
+*Last updated: 2026-01-27 — Phase 3 planned*
