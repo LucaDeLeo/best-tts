@@ -40,6 +40,16 @@ let playerDismissed = false;
 let currentChunkIndex: number = 0;
 let currentTotalChunks: number = 0;
 
+// Library autosave context (Phase 7)
+let libraryItemId: string | null = null;
+let libraryContentHash: string | null = null;
+let libraryContentLength: number | null = null;
+let autosaveInterval: ReturnType<typeof setInterval> | null = null;
+const AUTOSAVE_INTERVAL_MS = 10_000; // 10 seconds per CONTEXT.md
+
+// Track chunks for autosave (needed for chunkText)
+let currentChunks: string[] = [];
+
 // Message handler
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Only handle messages for content script
@@ -201,6 +211,9 @@ async function handlePause(): Promise<{ success: boolean }> {
     });
   }
 
+  // Save position immediately on pause (library autosave)
+  sendAutosavePosition();
+
   return { success: true };
 }
 
@@ -230,6 +243,9 @@ async function handleResume(): Promise<{ success: boolean; error?: string }> {
 }
 
 async function handleStop(): Promise<{ success: boolean }> {
+  // Save position immediately on stop (library autosave)
+  sendAutosavePosition();
+
   await cleanupAudio();
   cleanupHighlighting();
 
@@ -249,6 +265,9 @@ async function handleStop(): Promise<{ success: boolean }> {
 
   // Reset dismissed state so player shows on next playback
   playerDismissed = false;
+
+  // Clear library context
+  clearLibraryContext();
 
   return { success: true };
 }
@@ -419,6 +438,86 @@ function cleanupHighlighting(): void {
   highlightState = null;
 }
 
+// ============================================================================
+// Library Autosave Functions (Phase 7)
+// ============================================================================
+
+/**
+ * Start library playback with autosave context.
+ * Called when playing content from the library.
+ */
+function startLibraryPlayback(
+  itemId: string,
+  contentHash: string,
+  contentLength: number,
+  chunks: string[]
+): void {
+  libraryItemId = itemId;
+  libraryContentHash = contentHash;
+  libraryContentLength = contentLength;
+  currentChunks = chunks;
+
+  // Clear any existing autosave interval
+  if (autosaveInterval) clearInterval(autosaveInterval);
+
+  // Save position every 10 seconds during active playback
+  autosaveInterval = setInterval(() => {
+    if (libraryItemId && currentAudio && !currentAudio.paused) {
+      sendAutosavePosition();
+    }
+  }, AUTOSAVE_INTERVAL_MS);
+}
+
+/**
+ * Send autosave position to service worker.
+ * Called on interval (10s), pause, and stop.
+ */
+function sendAutosavePosition(): void {
+  if (!libraryItemId || currentChunkIndex === undefined) return;
+
+  const chunkText = currentChunks[currentChunkIndex]?.slice(0, 100) || '';
+
+  chrome.runtime.sendMessage({
+    target: 'service-worker',
+    type: MessageType.AUTOSAVE_POSITION,
+    itemId: libraryItemId,
+    chunkIndex: currentChunkIndex,
+    chunkText,
+    totalChunks: currentTotalChunks,
+    contentLength: libraryContentLength || 0,
+    contentHash: libraryContentHash || ''
+  }).catch((error) => {
+    console.error('Autosave failed:', error);
+  });
+}
+
+/**
+ * Clear library context when playback ends.
+ */
+function clearLibraryContext(): void {
+  if (autosaveInterval) {
+    clearInterval(autosaveInterval);
+    autosaveInterval = null;
+  }
+  libraryItemId = null;
+  libraryContentHash = null;
+  libraryContentLength = null;
+  currentChunks = [];
+}
+
+/**
+ * Set library context for autosave (called from external message).
+ * This allows the popup/service worker to configure library playback.
+ */
+export function setLibraryContext(
+  itemId: string,
+  contentHash: string,
+  contentLength: number,
+  chunks: string[]
+): void {
+  startLibraryPlayback(itemId, contentHash, contentLength, chunks);
+}
+
 /**
  * Handle initialization of highlighting mode.
  * Called before TTS playback starts to set up DOM spans.
@@ -558,7 +657,12 @@ async function handleShowFloatingPlayer(): Promise<{ success: boolean }> {
 
 // Cleanup highlighting on page unload
 window.addEventListener('beforeunload', () => {
+  // Save position before unload (best-effort)
+  sendAutosavePosition();
+
   cleanupHighlighting();
+  clearLibraryContext();
+
   // Destroy floating player on page unload
   if (floatingPlayer) {
     floatingPlayer.destroy();
