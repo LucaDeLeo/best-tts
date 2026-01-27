@@ -379,7 +379,9 @@ async function playChunk(chunkIndex: number): Promise<void> {
       type: MessageType.PLAY_AUDIO,
       audioData: result.audioData,           // base64-encoded audio
       audioMimeType: result.audioMimeType,   // MIME type for blob creation
-      generationToken: state.generationToken
+      generationToken: state.generationToken,
+      chunkIndex: chunkIndex,                // Index for highlighting
+      totalChunks: state.totalChunks         // Total chunks for progress
     });
 
     if (response.success) {
