@@ -120,6 +120,10 @@ Recent decisions affecting current work:
 - (06-01) Single EXTRACT_DOCUMENT message type with documentType field per CONTEXT.md
 - (06-01) Document types defined in document-types.ts, re-exported from messages.ts
 - (06-01) OffscreenHandledMessage union type extends handler for document messages
+- (06-02) External PDF.js worker with inline fallback for memory isolation
+- (06-02) PDF text normalization: spacing, hyphenation, whitespace collapse
+- (06-02) Early page count warning triggers after metadata load, before extraction
+- (06-02) AbortSignal support for PDF extraction cancellation
 - (06-03) BOM-based encoding detection for UTF-8 and UTF-16
 - (06-03) Text normalization: CRLF -> LF, remove null chars, collapse excess blank lines
 - (06-03) extractTextFile returns encoding type in result for debugging/display
@@ -137,9 +141,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T10:09:06Z
-Stopped at: Completed 06-03-PLAN.md (Text File Extraction)
+Last session: 2026-01-27T10:10:25Z
+Stopped at: Completed 06-02-PLAN.md (PDF Extraction)
 Resume file: None
 
 ---
-*Next action: Continue with 06-02-PLAN.md (PDF Extraction) or 06-04-PLAN.md (Popup Import UI)*
+*Next action: Continue with 06-04-PLAN.md (Popup Import UI) or 06-05-PLAN.md (Cancellation and Warnings)*
