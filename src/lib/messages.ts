@@ -1,5 +1,5 @@
 // Message targets
-export type MessageTarget = 'offscreen' | 'service-worker' | 'popup';
+export type MessageTarget = 'offscreen' | 'service-worker' | 'popup' | 'content-script';
 
 // Message types enum
 export const MessageType = {
@@ -16,6 +16,27 @@ export const MessageType = {
   // Status
   GET_STATUS: 'get-status',
   STATUS_UPDATE: 'status-update',
+
+  // Playback control (popup -> service worker -> content script)
+  PLAY_AUDIO: 'play-audio',       // Send audio data to content script
+  PAUSE_AUDIO: 'pause-audio',     // Pause current audio
+  RESUME_AUDIO: 'resume-audio',   // Resume paused audio
+  STOP_PLAYBACK: 'stop-playback', // Stop and reset
+
+  // Speed control
+  SET_SPEED: 'set-speed',         // Set playbackRate
+
+  // Content script -> service worker
+  AUDIO_ENDED: 'audio-ended',     // Playback finished naturally
+  AUDIO_ERROR: 'audio-error',     // Playback failed (e.g., autoplay blocked)
+  HEARTBEAT: 'heartbeat',         // Content script alive signal
+
+  // Skip control
+  SKIP_TO_CHUNK: 'skip-to-chunk', // Skip to specific chunk index
+
+  // Generation control
+  TTS_GENERATE_CHUNK: 'tts-generate-chunk',  // Generate single chunk
+  CHUNK_READY: 'chunk-ready',     // Chunk audio ready (offscreen -> sw)
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -72,6 +93,72 @@ export interface StatusUpdateMessage extends BaseMessage {
   };
 }
 
+// Playback control messages
+// Note: Uses base64-encoded audio data instead of blob URL because blob URLs are origin-bound
+// and cannot be loaded by content scripts running in web page context.
+export interface PlayAudioMessage extends BaseMessage {
+  type: typeof MessageType.PLAY_AUDIO;
+  audioData: string;      // Base64-encoded audio data
+  audioMimeType: string;  // e.g., 'audio/wav'
+  generationToken: string;
+}
+
+export interface PauseAudioMessage extends BaseMessage {
+  type: typeof MessageType.PAUSE_AUDIO;
+}
+
+export interface ResumeAudioMessage extends BaseMessage {
+  type: typeof MessageType.RESUME_AUDIO;
+}
+
+export interface StopPlaybackMessage extends BaseMessage {
+  type: typeof MessageType.STOP_PLAYBACK;
+}
+
+export interface SetSpeedMessage extends BaseMessage {
+  type: typeof MessageType.SET_SPEED;
+  speed: number;
+}
+
+export interface AudioEndedMessage extends BaseMessage {
+  type: typeof MessageType.AUDIO_ENDED;
+  generationToken: string;
+}
+
+export interface AudioErrorMessage extends BaseMessage {
+  type: typeof MessageType.AUDIO_ERROR;
+  error: string;
+  generationToken: string;
+}
+
+export interface HeartbeatMessage extends BaseMessage {
+  type: typeof MessageType.HEARTBEAT;
+  generationToken: string;
+  currentTime: number;
+  duration: number;
+}
+
+export interface SkipToChunkMessage extends BaseMessage {
+  type: typeof MessageType.SKIP_TO_CHUNK;
+  chunkIndex: number;
+}
+
+export interface TTSGenerateChunkMessage extends BaseMessage {
+  type: typeof MessageType.TTS_GENERATE_CHUNK;
+  text: string;
+  voice: string;
+  chunkIndex: number;
+  totalChunks: number;
+  generationToken: string;
+}
+
+export interface ChunkReadyMessage extends BaseMessage {
+  type: typeof MessageType.CHUNK_READY;
+  audioUrl: string;
+  chunkIndex: number;
+  generationToken: string;
+}
+
 // Union type for all messages
 export type TTSMessage =
   | TTSInitMessage
@@ -81,7 +168,18 @@ export type TTSMessage =
   | DownloadProgressMessage
   | GenerationCompleteMessage
   | GetStatusMessage
-  | StatusUpdateMessage;
+  | StatusUpdateMessage
+  | PlayAudioMessage
+  | PauseAudioMessage
+  | ResumeAudioMessage
+  | StopPlaybackMessage
+  | SetSpeedMessage
+  | AudioEndedMessage
+  | AudioErrorMessage
+  | HeartbeatMessage
+  | SkipToChunkMessage
+  | TTSGenerateChunkMessage
+  | ChunkReadyMessage;
 
 // Response types
 export interface TTSResponse {
