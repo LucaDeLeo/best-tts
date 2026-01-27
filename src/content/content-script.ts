@@ -11,6 +11,7 @@ import { highlightSentence, clearHighlight, maybeScrollToSentence } from '../lib
 import { createSelectionHighlighting, cleanupSelectionHighlighting } from '../lib/selection-highlighter';
 import { renderOverlayContent, removeOverlayContainer } from '../lib/overlay-highlighter';
 import { injectHighlightStyles, removeHighlightStyles } from './highlight-styles';
+import { createFloatingPlayer, destroyFloatingPlayer, type PlayerUIState } from './floating-player';
 
 console.log('Best TTS content script loaded');
 
@@ -26,6 +27,13 @@ const HEARTBEAT_INTERVAL_MS = 2000; // 2 seconds per CONTEXT.md
 
 // Highlight state
 let highlightState: HighlightState | null = null;
+
+// Floating player instance
+let floatingPlayer: ReturnType<typeof createFloatingPlayer> | null = null;
+
+// Chunk tracking for floating player progress display
+let currentChunkIndex: number = 0;
+let currentTotalChunks: number = 0;
 
 // Message handler
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -76,7 +84,24 @@ async function handleMessage(message: any): Promise<any> {
 }
 
 async function handlePlayAudio(msg: PlayAudioMessage): Promise<{ success: boolean; error?: string }> {
-  const { audioData, audioMimeType, generationToken, chunkIndex } = msg;
+  const { audioData, audioMimeType, generationToken, chunkIndex, totalChunks } = msg;
+
+  // Track chunk info for floating player
+  currentChunkIndex = chunkIndex;
+  currentTotalChunks = totalChunks;
+
+  // Initialize floating player if not exists
+  if (!floatingPlayer) {
+    floatingPlayer = createFloatingPlayer();
+  }
+
+  // Update player state to show playing
+  floatingPlayer.update({
+    status: 'playing',
+    currentChunk: chunkIndex,
+    totalChunks: totalChunks,
+    playbackSpeed: currentSpeed
+  });
 
   // Stop any existing playback
   await cleanupAudio();
@@ -147,6 +172,17 @@ async function handlePause(): Promise<{ success: boolean }> {
     currentAudio.pause();
     stopHeartbeat();
   }
+
+  // Update floating player to paused state
+  if (floatingPlayer) {
+    floatingPlayer.update({
+      status: 'paused',
+      currentChunk: currentChunkIndex,
+      totalChunks: currentTotalChunks,
+      playbackSpeed: currentSpeed
+    });
+  }
+
   return { success: true };
 }
 
@@ -155,6 +191,17 @@ async function handleResume(): Promise<{ success: boolean; error?: string }> {
     try {
       await currentAudio.play();
       startHeartbeat();
+
+      // Update floating player to playing state
+      if (floatingPlayer) {
+        floatingPlayer.update({
+          status: 'playing',
+          currentChunk: currentChunkIndex,
+          totalChunks: currentTotalChunks,
+          playbackSpeed: currentSpeed
+        });
+      }
+
       return { success: true };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Resume failed';
@@ -167,6 +214,21 @@ async function handleResume(): Promise<{ success: boolean; error?: string }> {
 async function handleStop(): Promise<{ success: boolean }> {
   await cleanupAudio();
   cleanupHighlighting();
+
+  // Hide floating player (set to idle status)
+  if (floatingPlayer) {
+    floatingPlayer.update({
+      status: 'idle',
+      currentChunk: 0,
+      totalChunks: 0,
+      playbackSpeed: currentSpeed
+    });
+  }
+
+  // Reset chunk tracking
+  currentChunkIndex = 0;
+  currentTotalChunks = 0;
+
   return { success: true };
 }
 
@@ -175,6 +237,17 @@ async function handleSetSpeed(msg: SetSpeedMessage): Promise<{ success: boolean 
   if (currentAudio) {
     currentAudio.playbackRate = currentSpeed;
   }
+
+  // Update floating player with new speed
+  if (floatingPlayer) {
+    floatingPlayer.update({
+      status: currentAudio && !currentAudio.paused ? 'playing' : 'paused',
+      currentChunk: currentChunkIndex,
+      totalChunks: currentTotalChunks,
+      playbackSpeed: msg.speed
+    });
+  }
+
   return { success: true };
 }
 
