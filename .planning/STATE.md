@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 5 of 8 (Floating Player)
-Plan: 1 of 5 in current phase
+Plan: 2 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 05-01-PLAN.md (Shadow DOM Component)
+Last activity: 2026-01-27 - Completed 05-02-PLAN.md (Playback Controls)
 
-Progress: [##################] ~56% (18/~32 plans estimated)
+Progress: [###################] ~59% (19/~32 plans estimated)
 
 ## Performance Metrics
 
@@ -31,10 +31,10 @@ Progress: [##################] ~56% (18/~32 plans estimated)
 | 02-basic-playback | 4 | 12 min | 3 min |
 | 03-content-extraction | 4 | 9 min | 2.25 min |
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
-| 05-floating-player | 1 | 2 min | 2 min |
+| 05-floating-player | 2 | 4 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 1 min, 1 min, 3 min, 3 min, 2 min
+- Last 5 plans: 1 min, 3 min, 3 min, 2 min, 2 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -101,6 +101,10 @@ Recent decisions affecting current work:
 - (05-01) Fixed bottom-right position with max z-index (2147483647)
 - (05-01) Inline styles with :host { all: initial } for complete CSS isolation
 - (05-01) Player starts hidden, shows on first PLAY_AUDIO
+- (05-02) Speed control cycles through presets on click (0.75 -> 2.0 -> 0.75)
+- (05-02) Dismiss button sends STOP_PLAYBACK to service worker
+- (05-02) Progress "X / Y" format, Speed "X.Xx" format
+- (05-02) Focus-scoped keyboard shortcuts (Space, Escape, Arrows)
 
 ### Pending Todos
 
@@ -115,9 +119,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T08:52:07Z
-Stopped at: Completed 05-01-PLAN.md (Shadow DOM Component)
+Last session: 2026-01-27T08:57:04Z
+Stopped at: Completed 05-02-PLAN.md (Playback Controls)
 Resume file: None
 
 ---
-*Next action: Continue with 05-02-PLAN.md (Playback Controls)*
+*Next action: Continue with 05-03-PLAN.md (State Sync)*
