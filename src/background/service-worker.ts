@@ -7,6 +7,7 @@ import {
   type HeartbeatMessage,
   type AudioEndedMessage,
   type AudioErrorMessage,
+  type SkipToChunkMessage,
 } from '../lib/messages';
 import {
   getPlaybackState,
@@ -14,6 +15,7 @@ import {
   resetPlaybackState,
   generateToken,
 } from '../lib/playback-state';
+import { getSelectedVoice } from '../lib/voice-storage';
 
 console.log('Best TTS service worker loaded');
 
@@ -111,26 +113,28 @@ async function handleServiceWorkerMessage(
       }
 
       case MessageType.PAUSE_AUDIO: {
-        const state = getPlaybackState();
-        if (state.activeTabId && state.status === 'playing') {
-          updatePlaybackState({ status: 'paused' });
-          chrome.tabs.sendMessage(state.activeTabId, {
+        const pauseState = getPlaybackState();
+        if (pauseState.activeTabId && pauseState.status === 'playing') {
+          chrome.tabs.sendMessage(pauseState.activeTabId, {
             target: 'content-script',
             type: MessageType.PAUSE_AUDIO
           }).catch(() => {});
+          updatePlaybackState({ status: 'paused' });
+          broadcastStatusUpdate();
         }
         sendResponse({ success: true });
         break;
       }
 
       case MessageType.RESUME_AUDIO: {
-        const state = getPlaybackState();
-        if (state.activeTabId && state.status === 'paused') {
-          updatePlaybackState({ status: 'playing' });
-          chrome.tabs.sendMessage(state.activeTabId, {
+        const resumeState = getPlaybackState();
+        if (resumeState.activeTabId && resumeState.status === 'paused') {
+          chrome.tabs.sendMessage(resumeState.activeTabId, {
             target: 'content-script',
             type: MessageType.RESUME_AUDIO
           }).catch(() => {});
+          updatePlaybackState({ status: 'playing' });
+          broadcastStatusUpdate();
         }
         sendResponse({ success: true });
         break;
@@ -147,20 +151,65 @@ async function handleServiceWorkerMessage(
 
       case MessageType.AUDIO_ENDED: {
         const ended = message as AudioEndedMessage;
-        if (ended.generationToken === getPlaybackState().generationToken) {
-          // Will be expanded in Plan 03 for auto-advance
-          updatePlaybackState({ status: 'idle' });
+        const endedState = getPlaybackState();
+        if (ended.generationToken === endedState.generationToken) {
+          const nextIndex = endedState.currentChunkIndex + 1;
+          if (nextIndex < endedState.totalChunks) {
+            // Auto-advance to next chunk
+            playChunk(nextIndex).catch(console.error);
+          } else {
+            // All chunks complete
+            updatePlaybackState({ status: 'idle' });
+            broadcastStatusUpdate();
+          }
         }
         sendResponse({ success: true });
         break;
       }
 
       case MessageType.AUDIO_ERROR: {
+        // Handle mid-playback errors from content script (e.g., audio decode failure, network error)
         const errMsg = message as AudioErrorMessage;
-        console.error('Audio playback error:', errMsg.error);
-        if (errMsg.generationToken === getPlaybackState().generationToken) {
+        const errorState = getPlaybackState();
+        if (errMsg.generationToken === errorState.generationToken) {
+          console.error('Audio playback error from content script:', errMsg.error);
+
+          // Reset playback state
           updatePlaybackState({ status: 'idle' });
+          broadcastStatusUpdate();
+
+          // Forward error to popup for user feedback
+          chrome.runtime.sendMessage({
+            target: 'popup',
+            type: MessageType.AUDIO_ERROR,
+            error: errMsg.error
+          }).catch(() => {});
         }
+        sendResponse({ success: true });
+        break;
+      }
+
+      case MessageType.SKIP_TO_CHUNK: {
+        const skipMsg = message as SkipToChunkMessage;
+        const skipState = getPlaybackState();
+        const targetIndex = skipMsg.chunkIndex;
+
+        // Validate target index
+        if (targetIndex < 0 || targetIndex >= skipState.totalChunks) {
+          sendResponse({ success: false, error: 'Invalid chunk index' });
+          break;
+        }
+
+        // Stop current playback in content script
+        if (skipState.activeTabId) {
+          chrome.tabs.sendMessage(skipState.activeTabId, {
+            target: 'content-script',
+            type: MessageType.STOP_PLAYBACK
+          }).catch(() => {});
+        }
+
+        // Generate and play the target chunk
+        playChunk(targetIndex).catch(console.error);
         sendResponse({ success: true });
         break;
       }
@@ -199,8 +248,7 @@ async function routeToOffscreen(
     // Forward message to offscreen document
     const response = await chrome.runtime.sendMessage(offscreenMessage);
 
-    // Handle TTS_GENERATE response - store chunks in playback state
-    // Full orchestration (generation + playback) will be implemented in Plan 03
+    // Handle TTS_GENERATE response - store chunks and start playback
     if (message.type === MessageType.TTS_GENERATE && response.success && response.chunks) {
       const token = generateToken();
       updatePlaybackState({
@@ -213,6 +261,9 @@ async function routeToOffscreen(
       console.log(`Stored ${response.chunks.length} chunks with token ${token}`);
       // Include generation token in response for client use
       response.generationToken = token;
+
+      // Start playing first chunk (don't await - let it run async)
+      playChunk(0).catch(console.error);
     }
 
     sendResponse(response);
@@ -226,10 +277,124 @@ async function routeToOffscreen(
 }
 
 /**
+ * Broadcast status update to popup
+ */
+function broadcastStatusUpdate(): void {
+  const state = getPlaybackState();
+  chrome.runtime.sendMessage({
+    target: 'popup',
+    type: MessageType.STATUS_UPDATE,
+    status: {
+      initialized: true,
+      currentVoice: undefined,
+      isPlaying: state.status === 'playing',
+      isGenerating: state.status === 'generating',
+      isPaused: state.status === 'paused',
+      currentChunkIndex: state.currentChunkIndex,
+      totalChunks: state.totalChunks,
+      playbackSpeed: state.playbackSpeed
+    }
+  }).catch(() => {});
+}
+
+/**
+ * Play a specific chunk by generating audio and sending to content script
+ */
+async function playChunk(chunkIndex: number): Promise<void> {
+  const state = getPlaybackState();
+
+  // Validate state
+  if (chunkIndex >= state.totalChunks || !state.generationToken) {
+    console.log('No more chunks or invalid state');
+    updatePlaybackState({ status: 'idle' });
+    broadcastStatusUpdate();
+    return;
+  }
+
+  // Get active tab
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    console.error('No active tab for playback');
+    updatePlaybackState({ status: 'idle' });
+    broadcastStatusUpdate();
+    return;
+  }
+
+  updatePlaybackState({
+    status: 'generating',
+    currentChunkIndex: chunkIndex,
+    activeTabId: tab.id
+  });
+  broadcastStatusUpdate();
+
+  // Generate chunk audio
+  const chunkText = state.chunks[chunkIndex];
+  const voice = await getSelectedVoice();
+
+  const result = await generateChunk(
+    chunkText,
+    voice,
+    chunkIndex,
+    state.totalChunks,
+    state.generationToken
+  );
+
+  // Check if generation was cancelled (token mismatch)
+  // Note: This is "soft cancellation" - the TTSEngine has no abort API, so generation
+  // runs to completion but results are discarded. This is acceptable for Phase 2
+  // because: (1) typical chunk generation is fast (<1s), (2) discarding prevents
+  // stale audio from playing, (3) true cancellation would require TTSEngine changes.
+  const currentState = getPlaybackState();
+  if (currentState.generationToken !== state.generationToken) {
+    console.log('Generation cancelled (token mismatch) - discarding result');
+    // No blob URL to revoke - audio data is base64 string (garbage collected)
+    return;
+  }
+
+  if (!result.success || !result.audioData) {
+    console.error('Chunk generation failed:', result.error);
+    updatePlaybackState({ status: 'idle' });
+    broadcastStatusUpdate();
+    return;
+  }
+
+  // Send audio data to content script (NOT blob URL - those are origin-bound)
+  try {
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      target: 'content-script',
+      type: MessageType.PLAY_AUDIO,
+      audioData: result.audioData,           // base64-encoded audio
+      audioMimeType: result.audioMimeType,   // MIME type for blob creation
+      generationToken: state.generationToken
+    });
+
+    if (response.success) {
+      updatePlaybackState({
+        status: 'playing'
+        // Note: Audio URL is created in content script, not stored here
+      });
+    } else {
+      // Autoplay blocked or other error
+      console.error('Content script playback failed:', response.error);
+      updatePlaybackState({ status: 'idle' });
+      // Send error to popup
+      chrome.runtime.sendMessage({
+        target: 'popup',
+        type: MessageType.AUDIO_ERROR,
+        error: response.error
+      }).catch(() => {});
+    }
+    broadcastStatusUpdate();
+  } catch (error) {
+    console.error('Failed to send to content script:', error);
+    updatePlaybackState({ status: 'idle' });
+    broadcastStatusUpdate();
+  }
+}
+
+/**
  * Request chunk generation from offscreen document
  * Returns base64-encoded audio data (not blob URL) for cross-origin transfer
- *
- * Note: This function is prepared for Plan 03 when full orchestration is implemented.
  * The content script will receive the audio data and create its own blob URL.
  */
 async function generateChunk(
@@ -254,8 +419,8 @@ async function generateChunk(
   return response;
 }
 
-// Export for potential future use (Plan 03)
-// TypeScript compile-time only - service workers don't have module exports
+// Reference to prevent unused function warning
+// generateChunk is called by playChunk above
 void generateChunk;
 
 // Listen for download progress from offscreen and broadcast to popup
