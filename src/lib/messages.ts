@@ -110,6 +110,9 @@ export const MessageType = {
   // Settings (Phase 8)
   GET_SETTINGS: 'get-settings',
   UPDATE_SETTINGS: 'update-settings',
+
+  // Voice preview (Phase 8)
+  VOICE_PREVIEW: 'voice-preview',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -360,6 +363,12 @@ export interface UpdateSettingsMessage extends BaseMessage {
   updates: Partial<import('./settings-storage').Settings>;
 }
 
+// Voice preview message (Phase 8)
+export interface VoicePreviewMessage extends BaseMessage {
+  type: typeof MessageType.VOICE_PREVIEW;
+  voice: string;
+}
+
 /**
  * Result returned from content extraction operations.
  * Used as sendResponse payload, not as a routable message.
@@ -413,7 +422,8 @@ export type TTSMessage =
   | DeleteLibraryItemMessage
   | GetRecentItemsMessage
   | GetSettingsMessage
-  | UpdateSettingsMessage;
+  | UpdateSettingsMessage
+  | VoicePreviewMessage;
 
 // Response types
 export interface TTSResponse {
@@ -438,6 +448,11 @@ export interface StatusResponse extends TTSResponse {
 export interface SaveToLibraryResponse extends TTSResponse {
   itemId?: string;
   alreadyExists?: boolean;
+}
+
+export interface VoicePreviewResponse extends TTSResponse {
+  audioData?: string;      // Base64-encoded audio
+  audioMimeType?: string;  // MIME type
 }
 
 // Helper to create messages
