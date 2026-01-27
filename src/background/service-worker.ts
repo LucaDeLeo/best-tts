@@ -513,6 +513,56 @@ async function handleServiceWorkerMessage(
         break;
       }
 
+      case MessageType.SAVE_TO_LIBRARY: {
+        const { item } = message as SaveToLibraryMessage;
+
+        // Check quota
+        const quota = await getStorageEstimateForLibrary();
+        const contentSize = new Blob([item.content]).size;
+        if (quota && quota.available < contentSize + 5 * 1024 * 1024) {
+          sendResponse({ success: false, error: 'Storage full' });
+          break;
+        }
+
+        // Check if already saved
+        const existing = await isUrlSaved(item.url);
+        if (existing) {
+          sendResponse({ success: true, alreadyExists: true, itemId: existing.id });
+          break;
+        }
+
+        // Create and save
+        const libraryItemToSave: LibraryItem = {
+          id: crypto.randomUUID(),
+          title: item.title,
+          url: item.url,
+          source: item.source,
+          folderId: item.folderId || null,
+          createdAt: Date.now(),
+          lastReadAt: Date.now(),
+          contentDeleted: false,
+          contentDeletedAt: null,
+          contentSize: contentSize,
+          contentHash: await hashContent(item.content),
+          resumeData: null
+        };
+
+        await saveLibraryItem(libraryItemToSave, item.content);
+        sendResponse({ success: true, itemId: libraryItemToSave.id });
+        break;
+      }
+
+      case MessageType.GET_LIBRARY_STATUS: {
+        const { url } = message as GetLibraryStatusMessage;
+        const existingItem = await isUrlSaved(url);
+        sendResponse({
+          success: true,
+          isSaved: !!existingItem,
+          itemId: existingItem?.id
+        });
+        break;
+      }
+
       default:
         sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
     }
@@ -782,6 +832,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
+  // Handle Save to Library context menu
+  if (info.menuItemId === 'save-to-library') {
+    await handleSaveToLibraryContextMenu(tab);
+    return;
+  }
+
   const messageType = info.menuItemId === 'best-tts-read-selection'
     ? MessageType.EXTRACT_SELECTION
     : MessageType.EXTRACT_ARTICLE;
@@ -817,6 +873,69 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     );
   }
 });
+
+/**
+ * Handle Save to Library context menu click.
+ * Extracts content and saves to library in one step.
+ */
+async function handleSaveToLibraryContextMenu(tab: chrome.tabs.Tab): Promise<void> {
+  if (!tab.id || !tab.url) {
+    showNotification('Error', 'No active tab found');
+    return;
+  }
+
+  // Check if already saved
+  const existing = await isUrlSaved(tab.url);
+  if (existing) {
+    showNotification('Already in Library', 'This page is already saved.');
+    return;
+  }
+
+  try {
+    // Extract article content
+    const result = await chrome.tabs.sendMessage(tab.id, {
+      target: 'content-script',
+      type: MessageType.EXTRACT_ARTICLE
+    }) as ExtractionResult;
+
+    if (!result.success || !result.text) {
+      showNotification('Extraction Failed', result.error || 'Could not extract content');
+      return;
+    }
+
+    // Create library item
+    const contentSize = new Blob([result.text]).size;
+    const libraryItem: LibraryItem = {
+      id: crypto.randomUUID(),
+      title: result.title || 'Untitled',
+      url: tab.url,
+      source: 'webpage',
+      folderId: null,
+      createdAt: Date.now(),
+      lastReadAt: Date.now(),
+      contentDeleted: false,
+      contentDeletedAt: null,
+      contentSize: contentSize,
+      contentHash: await hashContent(result.text),
+      resumeData: null
+    };
+
+    // Save to library
+    await saveLibraryItem(libraryItem, result.text);
+
+    showNotification(
+      'Saved to Library',
+      `"${result.title || 'Untitled'}" has been saved.`
+    );
+
+  } catch (error) {
+    console.error('Save to library failed:', error);
+    showNotification(
+      'Save Failed',
+      'Could not save to library. Make sure the page is fully loaded.'
+    );
+  }
+}
 
 /**
  * Show notification to user
