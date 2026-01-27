@@ -98,12 +98,16 @@ Plans:
   2. Highlighting follows along at all playback speeds (0.5x to 4x)
   3. Page scrolls automatically to keep highlighted text visible
   4. Highlighting works on extracted article content
-**Plans**: TBD
+**Plans**: 5 plans in 4 waves
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Highlight manager core, types, and CSS injection
+- [ ] 04-02-PLAN.md — Overlay mode highlighting for extracted articles
+- [ ] 04-03-PLAN.md — Selection mode highlighting with DOM wrapping
+- [ ] 04-04-PLAN.md — Content script integration with playback
+- [ ] 04-05-PLAN.md — Service worker flow and end-to-end wiring
 
-**Research Flag**: Needs research-phase (audio-text synchronization, DOM position mapping)
+**Context**: Completed (CONTEXT.md - sentence-level highlighting, dual-mode architecture)
 
 ### Phase 5: Floating Player
 **Goal**: User has persistent playback controls accessible on any webpage
@@ -179,7 +183,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 1. TTS Engine | 4/4 | ✓ Complete | 2026-01-27 |
 | 2. Basic Playback | 4/4 | ✓ Complete | 2026-01-27 |
 | 3. Content Extraction | 4/4 | ✓ Complete | 2026-01-27 |
-| 4. Text Highlighting | 0/? | Not started | - |
+| 4. Text Highlighting | 0/5 | Not started | - |
 | 5. Floating Player | 0/? | Not started | - |
 | 6. Document Support | 0/? | Not started | - |
 | 7. Library | 0/? | Not started | - |
