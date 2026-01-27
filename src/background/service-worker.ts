@@ -54,6 +54,16 @@ type RoutableMessage = TTSMessage & {
   forwardTo?: 'offscreen';
 };
 
+// Handle GET_TAB_ID requests - simple utility to let content script know its tab ID
+// This is used for rehydration logic to verify the content script is in the active playback tab
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'GET_TAB_ID') {
+    sendResponse({ tabId: sender.tab?.id });
+    return false; // Synchronous response
+  }
+  return false; // Not handled here
+});
+
 // Main message router
 chrome.runtime.onMessage.addListener((message: RoutableMessage, sender, sendResponse) => {
   // Only handle messages intended for service worker
@@ -734,4 +744,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   }
   return false;
+});
+
+// Detect hard navigation to handle state rehydration
+// Per CONTEXT.md decision [15]: SW stores state, content script rehydrates on load
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  const state = getPlaybackState();
+
+  // Only care about the tab we're playing in
+  if (state.activeTabId !== tabId) return;
+
+  if (changeInfo.status === 'loading') {
+    // Hard navigation started - audio will stop, content script destroyed
+    // Mark state as paused so rehydration shows correct state
+    if (state.status === 'playing') {
+      console.log('Hard navigation detected in active tab, marking as paused for rehydration');
+      // Update state to paused - audio element will be destroyed by navigation
+      // so we can't continue playing. User will need to resume manually.
+      updatePlaybackState({ status: 'paused' });
+      broadcastStatusUpdate();
+    }
+  }
+
+  if (changeInfo.status === 'complete' && state.status !== 'idle') {
+    // Page loaded - content script will request state via GET_STATUS
+    // and show player if playback was active
+    console.log('Page load complete, content script should rehydrate');
+  }
+});
+
+// Handle tab closure - reset state if the active playback tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  const state = getPlaybackState();
+  if (state.activeTabId === tabId) {
+    console.log('Active playback tab closed, resetting state');
+    resetPlaybackState();
+  }
 });
