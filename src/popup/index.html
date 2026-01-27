@@ -27,6 +27,22 @@
 
     <!-- Main Controls (shown when ready) -->
     <div id="main-section" class="main-section">
+      <!-- Extraction Section -->
+      <div class="extraction-section">
+        <div class="extraction-buttons">
+          <button id="read-page-btn" class="btn secondary" title="Extract and read this page">
+            Read This Page
+          </button>
+          <button id="read-selection-btn" class="btn secondary" title="Read selected text">
+            Read Selection
+          </button>
+        </div>
+        <div id="extraction-status" class="extraction-status hidden">
+          <span id="extraction-source"></span>
+          <button id="clear-extraction-btn" class="btn-icon" title="Clear">&#10005;</button>
+        </div>
+      </div>
+
       <!-- Text Input -->
       <div class="input-group">
         <label for="text-input">Text to speak</label>
