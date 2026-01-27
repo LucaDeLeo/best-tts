@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 6 of 8 (Document Support)
-Plan: 1 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 06-01-PLAN.md (Document Extraction Infrastructure)
+Last activity: 2026-01-27 - Completed 06-03-PLAN.md (Text File Extraction)
 
-Progress: [#########################] ~72% (23/~32 plans estimated)
+Progress: [##########################] ~78% (25/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23
-- Average duration: 2.78 min
-- Total execution time: 65 min
+- Total plans completed: 25
+- Average duration: 2.68 min
+- Total execution time: 67 min
 
 **By Phase:**
 
@@ -32,10 +32,10 @@ Progress: [#########################] ~72% (23/~32 plans estimated)
 | 03-content-extraction | 4 | 9 min | 2.25 min |
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
 | 05-floating-player | 5 | 12 min | 2.4 min |
-| 06-document-support | 1 | 4 min | 4 min |
+| 06-document-support | 3 | 6 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 2 min, 3 min, 3 min, 4 min
+- Last 5 plans: 2 min, 3 min, 3 min, 4 min, 2 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -120,6 +120,9 @@ Recent decisions affecting current work:
 - (06-01) Single EXTRACT_DOCUMENT message type with documentType field per CONTEXT.md
 - (06-01) Document types defined in document-types.ts, re-exported from messages.ts
 - (06-01) OffscreenHandledMessage union type extends handler for document messages
+- (06-03) BOM-based encoding detection for UTF-8 and UTF-16
+- (06-03) Text normalization: CRLF -> LF, remove null chars, collapse excess blank lines
+- (06-03) extractTextFile returns encoding type in result for debugging/display
 
 ### Pending Todos
 
@@ -134,9 +137,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T13:44:00Z
-Stopped at: Completed 06-01-PLAN.md (Document Extraction Infrastructure)
+Last session: 2026-01-27T10:09:06Z
+Stopped at: Completed 06-03-PLAN.md (Text File Extraction)
 Resume file: None
 
 ---
-*Next action: Continue with 06-02-PLAN.md (PDF Extraction) or 06-03-PLAN.md (Text File Extraction)*
+*Next action: Continue with 06-02-PLAN.md (PDF Extraction) or 06-04-PLAN.md (Popup Import UI)*
