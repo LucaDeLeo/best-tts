@@ -12,7 +12,7 @@ This roadmap delivers a privacy-focused Chrome extension for high-quality text-t
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- 🚧 **v1 Best TTS** Phases 1-8
+- ✓ **v1 Best TTS** Phases 1-8 (Complete)
 
 - [x] **Phase 1: TTS Engine** - Kokoro TTS running in browser via ONNX Runtime Web
 - [x] **Phase 2: Basic Playback** - Play/pause, speed control, and keyboard shortcuts
