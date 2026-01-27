@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Text Highlighting** - Sync text display with audio playback
 - [x] **Phase 5: Floating Player** - Mini player UI on any webpage
 - [x] **Phase 6: Document Support** - Import and read PDFs and text files
-- [ ] **Phase 7: Library** - Save, organize, and resume documents
+- [x] **Phase 7: Library** - Save, organize, and resume documents
 - [ ] **Phase 8: Side Panel & Polish** - Full UI, settings, dark mode
 
 ## Phase Details
@@ -165,13 +165,14 @@ Plans:
 **Plans**: 5 plans in 3 waves
 
 Plans:
-- [ ] 07-01-PLAN.md — Library storage module (types, IDB setup, CRUD)
-- [ ] 07-02-PLAN.md — Save to library (context menu, popup button)
-- [ ] 07-03-PLAN.md — Autosave and resume position with fallback chain
-- [ ] 07-04-PLAN.md — Folder management (create, rename, delete, move items)
-- [ ] 07-05-PLAN.md — Library UI (recent items, full library panel)
+- [x] 07-01-PLAN.md — Library storage module (types, IDB setup, CRUD)
+- [x] 07-02-PLAN.md — Save to library (context menu, popup button)
+- [x] 07-03-PLAN.md — Autosave and resume position with fallback chain
+- [x] 07-04-PLAN.md — Folder management (create, rename, delete, move items)
+- [x] 07-05-PLAN.md — Library UI (recent items, full library panel)
 
 **Context**: Completed (CONTEXT.md - split storage, idb wrapper, resume safety, folders-only)
+**Completed**: 2026-01-27
 
 ### Phase 8: Side Panel & Polish
 **Goal**: User has polished, complete UI with full settings control
@@ -202,9 +203,9 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 4. Text Highlighting | 5/5 | ✓ Complete | 2026-01-27 |
 | 5. Floating Player | 5/5 | ✓ Complete | 2026-01-27 |
 | 6. Document Support | 5/5 | ✓ Complete | 2026-01-27 |
-| 7. Library | 0/5 | Not started | - |
+| 7. Library | 5/5 | ✓ Complete | 2026-01-27 |
 | 8. Side Panel & Polish | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27 — Phase 7 planned*
+*Last updated: 2026-01-27 — Phase 7 complete*
