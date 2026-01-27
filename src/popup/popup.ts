@@ -1,4 +1,4 @@
-import { MessageType, type TTSResponse, type VoiceListResponse } from '../lib/messages';
+import { MessageType, type TTSResponse, type VoiceListResponse, type ExtractionResult } from '../lib/messages';
 import { getSelectedVoice, setSelectedVoice } from '../lib/voice-storage';
 import { getDownloadProgress } from '../lib/model-cache';
 import type { VoiceId } from '../lib/tts-engine';
@@ -29,6 +29,16 @@ const sentenceFill = document.getElementById('sentence-fill')!;
 const skipBackBtn = document.getElementById('skip-back-btn') as HTMLButtonElement;
 const skipForwardBtn = document.getElementById('skip-forward-btn') as HTMLButtonElement;
 
+// Extraction elements
+const readPageBtn = document.getElementById('read-page-btn') as HTMLButtonElement;
+const readSelectionBtn = document.getElementById('read-selection-btn') as HTMLButtonElement;
+const extractionStatus = document.getElementById('extraction-status')!;
+const extractionSource = document.getElementById('extraction-source')!;
+const clearExtractionBtn = document.getElementById('clear-extraction-btn') as HTMLButtonElement;
+
+// Port for service worker communication (keeps SW alive during extraction)
+let extractionPort: chrome.runtime.Port | null = null;
+
 // State
 let isInitialized = false;
 let isPlaying = false;
@@ -53,6 +63,14 @@ async function init() {
   speedSlider.addEventListener('input', handleSpeedChange);
   skipBackBtn.addEventListener('click', () => handleSkip(-1));
   skipForwardBtn.addEventListener('click', () => handleSkip(1));
+
+  // Extraction button listeners
+  readPageBtn.addEventListener('click', handleReadPage);
+  readSelectionBtn.addEventListener('click', handleReadSelection);
+  clearExtractionBtn.addEventListener('click', clearExtraction);
+
+  // Check for pending extraction (from context menu OR popup that closed mid-extraction)
+  await loadPendingExtraction();
 
   // Keyboard shortcuts (with focus guard)
   document.addEventListener('keydown', handleKeydown);
@@ -587,6 +605,179 @@ async function sendToOffscreen<T>(
       }
     );
   });
+}
+
+/**
+ * Handle "Read This Page" button - extract article content
+ */
+async function handleReadPage() {
+  await triggerExtraction(MessageType.EXTRACT_ARTICLE);
+}
+
+/**
+ * Handle "Read Selection" button - extract selected text
+ */
+async function handleReadSelection() {
+  await triggerExtraction(MessageType.EXTRACT_SELECTION);
+}
+
+/**
+ * Trigger extraction via service worker port connection.
+ *
+ * Flow per CONTEXT.md:
+ * 1. Popup establishes port to service worker via chrome.runtime.connect()
+ * 2. SW forwards extraction request to content script via tabs.sendMessage
+ * 3. Content script returns result via sendResponse
+ * 4. SW relays result back to popup over port
+ * 5. If popup closes mid-extraction, SW stores result in session storage
+ */
+async function triggerExtraction(messageType: string) {
+  // Disable buttons during extraction
+  readPageBtn.disabled = true;
+  readSelectionBtn.disabled = true;
+  readPageBtn.classList.add('loading');
+  readSelectionBtn.classList.add('loading');
+  showMessage('Extracting content...');
+
+  try {
+    // Get active tab ID to include in request
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      throw new Error('No active tab');
+    }
+
+    // Establish port connection to service worker
+    // This keeps SW alive for the duration of the extraction
+    extractionPort = chrome.runtime.connect({ name: 'extraction' });
+
+    // Wait for result via port message
+    const result = await new Promise<ExtractionResult>((resolve, reject) => {
+      if (!extractionPort) {
+        reject(new Error('Port not connected'));
+        return;
+      }
+
+      // Handle response from service worker
+      extractionPort.onMessage.addListener((message) => {
+        if (message.type === 'EXTRACTION_RESPONSE') {
+          resolve(message.result as ExtractionResult);
+        }
+      });
+
+      // Handle port disconnect (SW crashed or similar)
+      extractionPort.onDisconnect.addListener(() => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        }
+      });
+
+      // Send extraction request over port
+      extractionPort.postMessage({
+        type: messageType,
+        tabId: tab.id
+      });
+
+      // Timeout after 15s (content script has 10s internal timeout)
+      setTimeout(() => {
+        reject(new Error('Extraction timed out'));
+      }, 15000);
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Extraction failed');
+    }
+
+    // Show extracted content
+    showExtractedContent(result);
+
+  } catch (error) {
+    console.error('Extraction failed:', error);
+    showMessage(error instanceof Error ? error.message : 'Extraction failed', 'error');
+  } finally {
+    // Clean up port
+    if (extractionPort) {
+      extractionPort.disconnect();
+      extractionPort = null;
+    }
+    readPageBtn.disabled = false;
+    readSelectionBtn.disabled = false;
+    readPageBtn.classList.remove('loading');
+    readSelectionBtn.classList.remove('loading');
+  }
+}
+
+/**
+ * Pending extraction stored in session storage
+ */
+interface PendingExtraction {
+  text: string;
+  title?: string;
+  url?: string;
+  source: 'selection' | 'article';
+  timestamp: number;
+}
+
+/**
+ * Load any pending extraction from session storage.
+ * This handles two cases:
+ * 1. Context menu extraction completed while popup was closed
+ * 2. Popup closed mid-extraction and SW stored the result
+ */
+async function loadPendingExtraction() {
+  try {
+    const result = await chrome.storage.session.get('pendingExtraction');
+    const pendingExtraction = result.pendingExtraction as PendingExtraction | undefined;
+
+    if (pendingExtraction && pendingExtraction.text) {
+      // Check if it's recent (within last 5 minutes)
+      const fiveMinutes = 5 * 60 * 1000;
+      if (Date.now() - pendingExtraction.timestamp < fiveMinutes) {
+        showExtractedContent({
+          success: true,
+          text: pendingExtraction.text,
+          title: pendingExtraction.title,
+          url: pendingExtraction.url,
+          source: pendingExtraction.source
+        });
+        // Clear pending after loading
+        await chrome.storage.session.remove('pendingExtraction');
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load pending extraction:', error);
+  }
+}
+
+/**
+ * Display extracted content in the UI
+ */
+function showExtractedContent(result: ExtractionResult) {
+  if (!result.text) return;
+
+  // Populate text input with extracted content
+  textInput.value = result.text;
+  updatePlayButtonState();
+
+  // Show extraction status
+  const sourceLabel = result.source === 'article'
+    ? `Article: ${result.title || 'Untitled'}`
+    : `Selection from: ${result.title || 'Page'}`;
+
+  extractionSource.textContent = sourceLabel;
+  extractionSource.title = result.url || '';
+  extractionStatus.classList.remove('hidden');
+
+  showMessage('Content extracted! Click Play to listen.', 'success');
+}
+
+/**
+ * Clear extraction and reset UI
+ */
+function clearExtraction() {
+  textInput.value = '';
+  extractionStatus.classList.add('hidden');
+  updatePlayButtonState();
+  showMessage('Ready', 'success');
 }
 
 // Initialize on load
