@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - 🚧 **v1 Best TTS** Phases 1-8
 
-- [ ] **Phase 1: TTS Engine** - Kokoro TTS running in browser via ONNX Runtime Web
+- [x] **Phase 1: TTS Engine** - Kokoro TTS running in browser via ONNX Runtime Web
 - [ ] **Phase 2: Basic Playback** - Play/pause, speed control, and keyboard shortcuts
 - [ ] **Phase 3: Content Extraction** - Read selected text and full webpages
 - [ ] **Phase 4: Text Highlighting** - Sync text display with audio playback
@@ -38,12 +38,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans in 4 waves (sequential)
 
 Plans:
-- [ ] 01-01-PLAN.md — Project setup, manifest, message contracts
-- [ ] 01-02-PLAN.md — Service worker + offscreen document infrastructure
-- [ ] 01-03-PLAN.md — TTS engine with Kokoro model loading and playback
-- [ ] 01-04-PLAN.md — Popup UI for text input, voice selection, controls
+- [x] 01-01-PLAN.md — Project setup, manifest, message contracts
+- [x] 01-02-PLAN.md — Service worker + offscreen document infrastructure
+- [x] 01-03-PLAN.md — TTS engine with Kokoro model loading and playback
+- [x] 01-04-PLAN.md — Popup UI for text input, voice selection, controls
 
 **Research**: Completed (01-RESEARCH.md)
+**Completed**: 2026-01-27
 
 ### Phase 2: Basic Playback
 **Goal**: User has full control over audio playback with responsive controls
@@ -165,7 +166,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. TTS Engine | 0/4 | Planned | - |
+| 1. TTS Engine | 4/4 | ✓ Complete | 2026-01-27 |
 | 2. Basic Playback | 0/? | Not started | - |
 | 3. Content Extraction | 0/? | Not started | - |
 | 4. Text Highlighting | 0/? | Not started | - |
@@ -176,4 +177,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27*
+*Last updated: 2026-01-27 — Phase 1 complete*
