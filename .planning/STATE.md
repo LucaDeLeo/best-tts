@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 2 of 8 (Basic Playback)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 02-02-PLAN.md (Text Chunking)
+Last activity: 2026-01-27 - Completed 02-03-PLAN.md (Content Script Audio Player)
 
-Progress: [######----] ~19% (6/~32 plans estimated)
+Progress: [#######---] ~22% (7/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: 3 min
-- Total execution time: 20 min
+- Total execution time: 23 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-tts-engine | 4 | 16 min | 4 min |
-| 02-basic-playback | 2 | 4 min | 2 min |
+| 02-basic-playback | 3 | 7 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 3 min, 5 min, 4 min, 2 min, 2 min
+- Last 5 plans: 5 min, 4 min, 2 min, 2 min, 3 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - (02-02) Intl.Segmenter for sentence splitting (not regex) - handles abbreviations correctly
 - (02-02) MAX_CHUNK_LENGTH=500 fallback for texts without punctuation
 - (02-02) Locale fallback chain: provided -> navigator.language -> 'en'
+- (02-03) Audio plays in content script to inherit page's Media Engagement Index
+- (02-03) 2-second heartbeat interval for liveness detection
+- (02-03) User-friendly autoplay error message guides recovery
 
 ### Pending Todos
 
@@ -75,9 +78,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T05:43:21Z
-Stopped at: Completed 02-02-PLAN.md (Text Chunking)
+Last session: 2026-01-27T05:49:03Z
+Stopped at: Completed 02-03-PLAN.md (Content Script Audio Player)
 Resume file: None
 
 ---
-*Next action: Execute 02-03-PLAN.md (Content Script Audio Player)*
+*Next action: Execute 02-04-PLAN.md (Popup Playback Controls)*
