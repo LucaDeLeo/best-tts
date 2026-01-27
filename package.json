@@ -1,0 +1,38 @@
+{
+  "name": "best-tts",
+  "version": "0.1.0",
+  "description": "High-quality local TTS Chrome extension",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LucaDeLeo/best-tts.git"
+  },
+  "keywords": [
+    "tts",
+    "chrome-extension",
+    "kokoro"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/LucaDeLeo/best-tts/issues"
+  },
+  "homepage": "https://github.com/LucaDeLeo/best-tts#readme",
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "idb-keyval": "^6.2.2",
+    "kokoro-js": "^1.2.1",
+    "onnxruntime-web": "^1.23.2"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.3.0",
+    "@types/chrome": "^0.1.36",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vite-plugin-static-copy": "^3.2.0"
+  }
+}
