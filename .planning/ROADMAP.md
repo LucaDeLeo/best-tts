@@ -162,12 +162,16 @@ Plans:
   2. Reading position is remembered and resume works correctly
   3. User can organize library items with folders or tags
   4. All library data is stored locally (no cloud, works offline)
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves
 
 Plans:
-- [ ] 07-01: TBD
+- [ ] 07-01-PLAN.md — Library storage module (types, IDB setup, CRUD)
+- [ ] 07-02-PLAN.md — Save to library (context menu, popup button)
+- [ ] 07-03-PLAN.md — Autosave and resume position with fallback chain
+- [ ] 07-04-PLAN.md — Folder management (create, rename, delete, move items)
+- [ ] 07-05-PLAN.md — Library UI (recent items, full library panel)
 
-**Research Flag**: Standard CRUD patterns, skip research-phase
+**Context**: Completed (CONTEXT.md - split storage, idb wrapper, resume safety, folders-only)
 
 ### Phase 8: Side Panel & Polish
 **Goal**: User has polished, complete UI with full settings control
@@ -198,9 +202,9 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 4. Text Highlighting | 5/5 | ✓ Complete | 2026-01-27 |
 | 5. Floating Player | 5/5 | ✓ Complete | 2026-01-27 |
 | 6. Document Support | 5/5 | ✓ Complete | 2026-01-27 |
-| 7. Library | 0/? | Not started | - |
+| 7. Library | 0/5 | Not started | - |
 | 8. Side Panel & Polish | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27 — Phase 6 complete*
+*Last updated: 2026-01-27 — Phase 7 planned*
