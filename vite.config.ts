@@ -39,6 +39,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
+        sidepanel: resolve(__dirname, 'src/sidepanel/index.html'),
       },
     },
   },
