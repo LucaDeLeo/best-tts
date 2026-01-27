@@ -1,6 +1,7 @@
 import { MessageType, type TTSResponse, type VoiceListResponse } from '../lib/messages';
 import { getSelectedVoice, setSelectedVoice } from '../lib/voice-storage';
 import { getDownloadProgress } from '../lib/model-cache';
+import type { VoiceId } from '../lib/tts-engine';
 
 // DOM Elements
 const statusIndicator = document.getElementById('status-indicator')!;
@@ -11,12 +12,12 @@ const progressFile = document.getElementById('progress-file')!;
 const mainSection = document.getElementById('main-section')!;
 const textInput = document.getElementById('text-input') as HTMLTextAreaElement;
 const voiceSelect = document.getElementById('voice-select') as HTMLSelectElement;
-const playBtn = document.getElementById('play-btn')!;
-const stopBtn = document.getElementById('stop-btn')!;
+const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
+const stopBtn = document.getElementById('stop-btn') as HTMLButtonElement;
 const message = document.getElementById('message')!;
 const errorSection = document.getElementById('error-section')!;
 const errorMessage = document.getElementById('error-message')!;
-const retryBtn = document.getElementById('retry-btn')!;
+const retryBtn = document.getElementById('retry-btn') as HTMLButtonElement;
 
 // State
 let isInitialized = false;
@@ -257,7 +258,7 @@ async function handleRetry() {
  * Handle voice selection change
  */
 async function handleVoiceChange() {
-  const voice = voiceSelect.value;
+  const voice = voiceSelect.value as VoiceId;
   if (voice) {
     await setSelectedVoice(voice);
   }
