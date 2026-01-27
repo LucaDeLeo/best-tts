@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 1 of 8 (TTS Engine)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 01-02-PLAN.md (Service Worker + Offscreen Document)
+Last activity: 2026-01-27 - Completed 01-03-PLAN.md (TTS Engine Integration)
 
-Progress: [##--------] ~6% (2/~32 plans estimated)
+Progress: [###-------] ~9% (3/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 3.5 min
-- Total execution time: 7 min
+- Total plans completed: 3
+- Average duration: 4 min
+- Total execution time: 12 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-tts-engine | 2 | 7 min | 3.5 min |
+| 01-tts-engine | 3 | 12 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 4 min, 3 min
+- Last 5 plans: 4 min, 3 min, 5 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -47,6 +47,9 @@ Recent decisions affecting current work:
 - (01-01) Added offscreen as explicit rollup input
 - (01-02) Service worker is pure router, all TTS logic in offscreen document
 - (01-02) Used intersection type for RoutableMessage (TTSMessage is union)
+- (01-03) Defined VOICE_IDS const array for type-safe voice IDs (kokoro-js VOICES not exported)
+- (01-03) Single-threaded WASM (numThreads=1) to avoid cross-origin isolation issues
+- (01-03) WASM files copied to dist/assets/ via vite-plugin-static-copy
 
 ### Pending Todos
 
@@ -61,9 +64,9 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-27T04:29:19Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-01-27T04:40:00Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
 
 ---
-*Next action: Execute 01-03-PLAN.md (TTS Engine Integration)*
+*Next action: Execute 01-04-PLAN.md (Popup UI)*
