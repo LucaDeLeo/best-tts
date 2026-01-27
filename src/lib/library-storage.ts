@@ -204,3 +204,180 @@ export async function updateLibraryItemPosition(
 
   await db.put('library-items', item);
 }
+
+// ============================================
+// Folder CRUD Operations
+// ============================================
+
+/**
+ * Create a new folder.
+ */
+export async function createFolder(name: string): Promise<LibraryFolder> {
+  const db = await getLibraryDB();
+  const now = Date.now();
+  const folder: LibraryFolder = {
+    id: crypto.randomUUID(),
+    name,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.put('library-folders', folder);
+  return folder;
+}
+
+/**
+ * Rename a folder.
+ */
+export async function renameFolder(id: string, name: string): Promise<void> {
+  const db = await getLibraryDB();
+  const folder = await db.get('library-folders', id);
+  if (!folder) return;
+
+  folder.name = name;
+  folder.updatedAt = Date.now();
+  await db.put('library-folders', folder);
+}
+
+/**
+ * Delete a folder.
+ * Items in the folder are moved to root (folderId becomes null).
+ */
+export async function deleteFolder(id: string): Promise<void> {
+  const db = await getLibraryDB();
+
+  // Move items in this folder to root
+  const items = await db.getAll('library-items');
+  const itemsInFolder = items.filter((item) => item.folderId === id);
+
+  const tx = db.transaction(['library-items', 'library-folders'], 'readwrite');
+
+  // Update items to root
+  for (const item of itemsInFolder) {
+    item.folderId = null;
+    tx.objectStore('library-items').put(item);
+  }
+
+  // Delete the folder
+  tx.objectStore('library-folders').delete(id);
+
+  await tx.done;
+}
+
+/**
+ * Get all folders sorted by name.
+ */
+export async function getFolders(): Promise<LibraryFolder[]> {
+  const db = await getLibraryDB();
+  const folders = await db.getAll('library-folders');
+  return folders.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ============================================
+// Helper Functions
+// ============================================
+
+/**
+ * Hash content using SHA-256.
+ * Uses Web Crypto API for browser-native, secure hashing.
+ */
+export async function hashContent(content: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Get recent items using the by-lastReadAt index.
+ */
+export async function getRecentItems(limit = 5): Promise<LibraryItem[]> {
+  const db = await getLibraryDB();
+  const tx = db.transaction('library-items', 'readonly');
+  const index = tx.store.index('by-lastReadAt');
+
+  const items: LibraryItem[] = [];
+  let cursor = await index.openCursor(null, 'prev');
+
+  while (cursor && items.length < limit) {
+    items.push(cursor.value);
+    cursor = await cursor.continue();
+  }
+
+  return items;
+}
+
+/**
+ * Storage estimate result
+ */
+export interface StorageEstimate {
+  canSave: boolean;
+  available: number;
+  usage: number;
+}
+
+/**
+ * Get storage estimate for the library.
+ * Returns null if the API is unavailable or unreliable.
+ */
+export async function getStorageEstimateForLibrary(): Promise<StorageEstimate | null> {
+  if (!navigator.storage?.estimate) return null;
+
+  try {
+    const estimate = await navigator.storage.estimate();
+    // Some browsers return 0 or undefined for quota
+    if (!estimate.quota || estimate.quota === 0) return null;
+
+    return {
+      canSave: true,
+      available: estimate.quota - (estimate.usage || 0),
+      usage: estimate.usage || 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ============================================
+// Error Handling & Retry Logic
+// ============================================
+
+/**
+ * Check if an error is transient and can be retried.
+ */
+function isTransientError(error: Error): boolean {
+  return error.name === 'AbortError' || error.name === 'InvalidStateError';
+}
+
+/**
+ * Sleep for a given duration.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Execute an operation with retry logic for transient errors.
+ * Uses exponential backoff: 100ms, 200ms, 400ms.
+ */
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries = 3
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof Error && isTransientError(error)) {
+        lastError = error;
+        await sleep(100 * Math.pow(2, i)); // Exponential backoff
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError;
+}
