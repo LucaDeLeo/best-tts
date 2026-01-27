@@ -1,4 +1,10 @@
-import { MessageType, type PlayAudioMessage, type SetSpeedMessage } from '../lib/messages';
+import {
+  MessageType,
+  type PlayAudioMessage,
+  type SetSpeedMessage,
+  type ExtractionResult
+} from '../lib/messages';
+import { getSelectedText, extractArticle } from '../lib/content-extractor';
 
 console.log('Best TTS content script loaded');
 
