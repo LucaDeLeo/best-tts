@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 4 of 8 (Text Highlighting)
-Plan: 3 of 5 in current phase
+Plan: 4 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-27 - Completed 04-02-PLAN.md (Overlay Mode Highlighting)
+Last activity: 2026-01-27 - Completed 04-04-PLAN.md (Playback Integration)
 
-Progress: [###############] ~47% (15/~32 plans estimated)
+Progress: [################] ~50% (16/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
+- Total plans completed: 16
 - Average duration: 2.9 min
-- Total execution time: 43 min
+- Total execution time: 46 min
 
 **By Phase:**
 
@@ -30,10 +30,10 @@ Progress: [###############] ~47% (15/~32 plans estimated)
 | 01-tts-engine | 4 | 16 min | 4 min |
 | 02-basic-playback | 4 | 12 min | 3 min |
 | 03-content-extraction | 4 | 9 min | 2.25 min |
-| 04-text-highlighting | 3 | 6 min | 2 min |
+| 04-text-highlighting | 4 | 9 min | 2.25 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 3 min, 4 min, 1 min, 1 min
+- Last 5 plans: 3 min, 4 min, 1 min, 1 min, 3 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -90,6 +90,9 @@ Recent decisions affecting current work:
 - (04-03) DOM text node walking via TreeWalker (NOT selection.toString())
 - (04-03) Cumulative offset map for accurate sentence boundary mapping
 - (04-03) splitText() calls tracked in SplitNodeRecord for DOM restoration
+- (04-04) chunkIndex passed in PLAY_AUDIO for event-driven highlighting
+- (04-04) INIT_HIGHLIGHTING message initializes mode before playback
+- (04-04) Mode-specific cleanup (selection unwrap vs overlay remove)
 
 ### Pending Todos
 
@@ -104,9 +107,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T07:53:59Z
-Stopped at: Completed 04-02-PLAN.md (Overlay Mode Highlighting)
+Last session: 2026-01-27T07:59:30Z
+Stopped at: Completed 04-04-PLAN.md (Playback Integration)
 Resume file: None
 
 ---
-*Next action: Execute 04-04-PLAN.md (Playback Integration)*
+*Next action: Execute 04-05-PLAN.md (E2E Testing)*
