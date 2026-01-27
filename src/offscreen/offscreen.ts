@@ -6,6 +6,7 @@ import {
   type TTSGenerateChunkMessage,
   type OffscreenExtractMessage,
   type DocumentExtractionResult,
+  type DocumentType,
   EXTRACTION_THRESHOLDS,
 } from '../lib/messages';
 import { TTSEngine, type VoiceId } from '../lib/tts-engine';
@@ -16,6 +17,95 @@ import { extractTextFile } from '../lib/text-file-extractor';
 import { extractPdfText } from '../lib/pdf-extractor';
 
 console.log('Best TTS offscreen document loaded');
+
+// ============================================================================
+// IndexedDB Chunk Storage (per CONTEXT.md Decision #2)
+// Chunks are stored in offscreen IndexedDB, not service worker memory
+// ============================================================================
+
+const DB_NAME = 'extraction-chunks';
+const STORE_NAME = 'chunks';
+
+let chunkDb: IDBDatabase | null = null;
+
+async function openChunkDb(): Promise<IDBDatabase> {
+  if (chunkDb) return chunkDb;
+
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      chunkDb = request.result;
+      resolve(chunkDb);
+    };
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+      }
+    };
+  });
+}
+
+async function storeChunkInDb(extractionId: string, chunkIndex: number, data: ArrayBuffer): Promise<void> {
+  const db = await openChunkDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const key = `${extractionId}-${chunkIndex}`;
+    store.put({ key, data });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getChunksFromDb(extractionId: string, totalChunks: number): Promise<ArrayBuffer[]> {
+  const db = await openChunkDb();
+  const chunks: ArrayBuffer[] = [];
+
+  for (let i = 0; i < totalChunks; i++) {
+    const chunk = await new Promise<ArrayBuffer | null>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const key = `${extractionId}-${i}`;
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result?.data || null);
+      request.onerror = () => reject(request.error);
+    });
+
+    if (!chunk) throw new Error(`Missing chunk ${i}`);
+    chunks.push(chunk);
+  }
+
+  return chunks;
+}
+
+async function deleteChunksFromDb(extractionId: string): Promise<void> {
+  const db = await openChunkDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    // Delete all keys starting with extractionId
+    const request = store.openCursor();
+    request.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        if (cursor.key.toString().startsWith(extractionId)) {
+          cursor.delete();
+        }
+        cursor.continue();
+      }
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Extraction metadata for chunked uploads
+const chunkMetadata = new Map<string, { documentType: DocumentType; filename: string; totalChunks: number; receivedChunks: number }>();
+
+// Active extraction abort controllers for cancellation
+const activeAbortControllers = new Map<string, AbortController>();
 
 // Response type for chunk generation
 interface ChunkReadyResponse extends TTSResponse {
@@ -30,8 +120,54 @@ interface GenerateResponse extends TTSResponse {
   chunks?: string[];
 }
 
+// Chunk storage messages
+interface InitChunkStorageMessage {
+  target: 'offscreen';
+  type: 'init-chunk-storage';
+  extractionId: string;
+  documentType: DocumentType;
+  filename: string;
+  fileSize: number;
+}
+
+interface StoreChunkMessage {
+  target: 'offscreen';
+  type: 'store-chunk';
+  extractionId: string;
+  chunkIndex: number;
+  totalChunks: number;
+  data: ArrayBuffer;
+}
+
+interface ExtractFromChunksMessage {
+  target: 'offscreen';
+  type: 'extract-from-chunks';
+  extractionId: string;
+  documentType: DocumentType;
+  filename: string;
+}
+
+interface CleanupChunksMessage {
+  target: 'offscreen';
+  type: 'cleanup-chunks';
+  extractionId: string;
+}
+
+interface CancelExtractionMessage {
+  target: 'offscreen';
+  type: 'cancel-extraction';
+  extractionId: string;
+}
+
 // Union type for all messages handled by offscreen document
-type OffscreenHandledMessage = TTSMessage | OffscreenExtractMessage;
+type OffscreenHandledMessage =
+  | TTSMessage
+  | OffscreenExtractMessage
+  | InitChunkStorageMessage
+  | StoreChunkMessage
+  | ExtractFromChunksMessage
+  | CleanupChunksMessage
+  | CancelExtractionMessage;
 
 // Message handler
 chrome.runtime.onMessage.addListener((message: OffscreenHandledMessage, sender, sendResponse) => {
@@ -78,6 +214,99 @@ async function handleMessage(message: OffscreenHandledMessage): Promise<TTSRespo
 
     case MessageType.EXTRACT_DOCUMENT:
       return handleExtractDocument(message as unknown as OffscreenExtractMessage);
+
+    // Chunk storage messages (per CONTEXT.md Decision #2)
+    case MessageType.INIT_CHUNK_STORAGE: {
+      const msg = message as InitChunkStorageMessage;
+      const totalChunks = Math.ceil(msg.fileSize / EXTRACTION_THRESHOLDS.CHUNK_SIZE_BYTES);
+      chunkMetadata.set(msg.extractionId, {
+        documentType: msg.documentType,
+        filename: msg.filename,
+        totalChunks,
+        receivedChunks: 0
+      });
+      return { success: true };
+    }
+
+    case MessageType.STORE_CHUNK: {
+      const msg = message as StoreChunkMessage;
+      await storeChunkInDb(msg.extractionId, msg.chunkIndex, msg.data);
+      const meta = chunkMetadata.get(msg.extractionId);
+      if (meta) meta.receivedChunks++;
+      return { success: true };
+    }
+
+    case MessageType.EXTRACT_FROM_CHUNKS: {
+      const msg = message as ExtractFromChunksMessage;
+      const meta = chunkMetadata.get(msg.extractionId);
+      if (!meta) {
+        return { success: false, error: 'No chunk metadata', extractionId: msg.extractionId };
+      }
+
+      try {
+        // Create abort controller for cancellation support
+        const abortController = new AbortController();
+        activeAbortControllers.set(msg.extractionId, abortController);
+
+        // Reassemble chunks from IndexedDB
+        const chunks = await getChunksFromDb(msg.extractionId, meta.totalChunks);
+        const totalSize = chunks.reduce((sum, c) => sum + c.byteLength, 0);
+        const data = new ArrayBuffer(totalSize);
+        const view = new Uint8Array(data);
+        let offset = 0;
+        for (const chunk of chunks) {
+          view.set(new Uint8Array(chunk), offset);
+          offset += chunk.byteLength;
+        }
+
+        // Clean up IndexedDB chunks
+        await deleteChunksFromDb(msg.extractionId);
+        chunkMetadata.delete(msg.extractionId);
+
+        // Perform extraction with abort signal
+        const result = await handleExtractDocumentWithSignal({
+          target: 'offscreen',
+          type: MessageType.EXTRACT_DOCUMENT,
+          documentType: msg.documentType,
+          data,
+          filename: msg.filename,
+          extractionId: msg.extractionId
+        } as OffscreenExtractMessage, abortController.signal);
+
+        activeAbortControllers.delete(msg.extractionId);
+        return result;
+      } catch (error) {
+        activeAbortControllers.delete(msg.extractionId);
+        await deleteChunksFromDb(msg.extractionId).catch(() => {});
+        chunkMetadata.delete(msg.extractionId);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Extraction failed',
+          extractionId: msg.extractionId
+        };
+      }
+    }
+
+    case MessageType.CLEANUP_CHUNKS: {
+      const msg = message as CleanupChunksMessage;
+      await deleteChunksFromDb(msg.extractionId).catch(() => {});
+      chunkMetadata.delete(msg.extractionId);
+      return { success: true };
+    }
+
+    case MessageType.CANCEL_EXTRACTION: {
+      const msg = message as CancelExtractionMessage;
+      // Abort any active extraction
+      const controller = activeAbortControllers.get(msg.extractionId);
+      if (controller) {
+        controller.abort();
+        activeAbortControllers.delete(msg.extractionId);
+      }
+      // Clean up chunks
+      await deleteChunksFromDb(msg.extractionId).catch(() => {});
+      chunkMetadata.delete(msg.extractionId);
+      return { success: true };
+    }
 
     default:
       return { success: false, error: `Unknown message type: ${(message as TTSMessage).type}` };
@@ -272,6 +501,17 @@ async function handleGetStatus(): Promise<TTSResponse & { initialized: boolean }
  * PDF.js and TextDecoder run here to avoid popup memory pressure.
  */
 async function handleExtractDocument(msg: OffscreenExtractMessage): Promise<DocumentExtractionResult> {
+  return handleExtractDocumentWithSignal(msg);
+}
+
+/**
+ * Extract text from a document with optional abort signal for cancellation.
+ * Per CONTEXT.md Decision #11: Support cancellation for long extractions.
+ */
+async function handleExtractDocumentWithSignal(
+  msg: OffscreenExtractMessage,
+  signal?: AbortSignal
+): Promise<DocumentExtractionResult> {
   const { documentType, data, filename, extractionId } = msg;
 
   console.log(`Extracting ${documentType} document: ${filename} (${data.byteLength} bytes)`);
@@ -294,7 +534,7 @@ async function handleExtractDocument(msg: OffscreenExtractMessage): Promise<Docu
               // Popup might be closed
             });
           },
-          // signal passed from 06-05 (cancellation support)
+          signal, // Pass abort signal for cancellation
           pageCountThreshold: EXTRACTION_THRESHOLDS.PAGE_COUNT,
           onPageCountWarning: async (pageCount, threshold) => {
             // Notify service worker of page count warning
@@ -325,6 +565,15 @@ async function handleExtractDocument(msg: OffscreenExtractMessage): Promise<Docu
 
       case 'txt':
       case 'md': {
+        // Check for cancellation before text file extraction
+        if (signal?.aborted) {
+          return {
+            success: false,
+            error: 'Extraction cancelled',
+            extractionId
+          };
+        }
+
         const textResult = extractTextFile(data, filename);
 
         return {
