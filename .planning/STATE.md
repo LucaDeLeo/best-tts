@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Read any text on the web or in documents with high-quality local TTS that works offline and keeps all data private.
-**Current focus:** Phase 5 - Floating Player (Complete, Verified)
+**Current focus:** Phase 6 - Document Support (In Progress)
 
 ## Current Position
 
-Phase: 5 of 8 (Floating Player)
-Plan: 5 of 5 in current phase
-Status: Phase complete
-Last activity: 2026-01-27 - Completed 05-05-PLAN.md (Navigation Persistence)
+Phase: 6 of 8 (Document Support)
+Plan: 1 of 5 in current phase
+Status: In progress
+Last activity: 2026-01-27 - Completed 06-01-PLAN.md (Document Extraction Infrastructure)
 
-Progress: [########################] ~69% (22/~32 plans estimated)
+Progress: [#########################] ~72% (23/~32 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 22
-- Average duration: 2.77 min
-- Total execution time: 61 min
+- Total plans completed: 23
+- Average duration: 2.78 min
+- Total execution time: 65 min
 
 **By Phase:**
 
@@ -32,9 +32,10 @@ Progress: [########################] ~69% (22/~32 plans estimated)
 | 03-content-extraction | 4 | 9 min | 2.25 min |
 | 04-text-highlighting | 5 | 12 min | 2.4 min |
 | 05-floating-player | 5 | 12 min | 2.4 min |
+| 06-document-support | 1 | 4 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 3 min, 2 min, 2 min, 2 min, 3 min
+- Last 5 plans: 2 min, 2 min, 3 min, 3 min, 4 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -116,6 +117,9 @@ Recent decisions affecting current work:
 - (05-05) tabs.onRemoved resets playback state when active tab closes
 - (05-05) GET_TAB_ID utility message for content script tab verification
 - (05-05) Rehydration creates player only if this tab is activeTabId with valid chunks
+- (06-01) Single EXTRACT_DOCUMENT message type with documentType field per CONTEXT.md
+- (06-01) Document types defined in document-types.ts, re-exported from messages.ts
+- (06-01) OffscreenHandledMessage union type extends handler for document messages
 
 ### Pending Todos
 
@@ -130,9 +134,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T09:05:35Z
-Stopped at: Completed 05-04-PLAN.md (Dismiss/Minimize) - Phase 5 complete
+Last session: 2026-01-27T13:44:00Z
+Stopped at: Completed 06-01-PLAN.md (Document Extraction Infrastructure)
 Resume file: None
 
 ---
-*Next action: Phase 5 complete and verified. Ready for Phase 6 (Document Support).*
+*Next action: Continue with 06-02-PLAN.md (PDF Extraction) or 06-03-PLAN.md (Text File Extraction)*
