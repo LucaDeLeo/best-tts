@@ -373,6 +373,101 @@ export function createFloatingPlayer(): {
     window.dispatchEvent(new CustomEvent('besttts-player-dismissed'));
   };
 
+  // Add ARIA live region for screen reader announcements
+  const announcer = document.createElement('span');
+  announcer.setAttribute('aria-live', 'polite');
+  announcer.setAttribute('aria-atomic', 'true');
+  Object.assign(announcer.style, {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: '0',
+    margin: '-1px',
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    border: '0'
+  });
+  container.appendChild(announcer);
+
+  // Helper to announce state changes to screen readers
+  function announce(message: string): void {
+    announcer.textContent = message;
+  }
+
+  // Focus-scoped keyboard handler (per CONTEXT.md decision [12])
+  // Only handles keys when player container has focus
+  container.addEventListener('keydown', (e) => {
+    switch (e.key) {
+      case ' ':
+      case 'Enter':
+        e.preventDefault();
+        // Toggle play/pause
+        if (currentState.status === 'playing') {
+          sendPlaybackCommand(MessageType.PAUSE_AUDIO);
+          announce('Paused');
+        } else if (currentState.status === 'paused') {
+          sendPlaybackCommand(MessageType.RESUME_AUDIO);
+          announce(`Playing sentence ${currentState.currentChunk + 1} of ${currentState.totalChunks}`);
+        }
+        break;
+
+      case 'Escape':
+        e.preventDefault();
+        // Dismiss player
+        sendPlaybackCommand(MessageType.STOP_PLAYBACK);
+        announce('Playback stopped');
+        break;
+
+      case 'ArrowLeft':
+        e.preventDefault();
+        // Skip previous
+        if (currentState.currentChunk > 0) {
+          const prevIndex = currentState.currentChunk - 1;
+          sendPlaybackCommand(MessageType.SKIP_TO_CHUNK, { chunkIndex: prevIndex });
+          announce(`Sentence ${prevIndex + 1} of ${currentState.totalChunks}`);
+        }
+        break;
+
+      case 'ArrowRight':
+        e.preventDefault();
+        // Skip next
+        if (currentState.currentChunk < currentState.totalChunks - 1) {
+          const nextIndex = currentState.currentChunk + 1;
+          sendPlaybackCommand(MessageType.SKIP_TO_CHUNK, { chunkIndex: nextIndex });
+          announce(`Sentence ${nextIndex + 1} of ${currentState.totalChunks}`);
+        }
+        break;
+
+      case 'ArrowUp':
+        e.preventDefault();
+        // Increase speed
+        {
+          const fasterIdx = SPEED_PRESETS.findIndex(s => s > currentState.playbackSpeed);
+          if (fasterIdx !== -1) {
+            const newSpeed = SPEED_PRESETS[fasterIdx];
+            sendPlaybackCommand(MessageType.SET_SPEED, { speed: newSpeed });
+            announce(`Speed ${newSpeed.toFixed(2)}x`);
+          }
+        }
+        break;
+
+      case 'ArrowDown':
+        e.preventDefault();
+        // Decrease speed
+        {
+          const speeds = [...SPEED_PRESETS].reverse();
+          const slowerIdx = speeds.findIndex(s => s < currentState.playbackSpeed);
+          if (slowerIdx !== -1) {
+            const newSpeed = speeds[slowerIdx];
+            sendPlaybackCommand(MessageType.SET_SPEED, { speed: newSpeed });
+            announce(`Speed ${newSpeed.toFixed(2)}x`);
+          }
+        }
+        break;
+    }
+  });
+
   // Add host to document
   document.body.appendChild(host);
   hostElement = host;
