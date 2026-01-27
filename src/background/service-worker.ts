@@ -12,6 +12,7 @@ import {
   getPlaybackState,
   updatePlaybackState,
   resetPlaybackState,
+  generateToken,
 } from '../lib/playback-state';
 
 console.log('Best TTS service worker loaded');
@@ -197,6 +198,23 @@ async function routeToOffscreen(
 
     // Forward message to offscreen document
     const response = await chrome.runtime.sendMessage(offscreenMessage);
+
+    // Handle TTS_GENERATE response - store chunks in playback state
+    // Full orchestration (generation + playback) will be implemented in Plan 03
+    if (message.type === MessageType.TTS_GENERATE && response.success && response.chunks) {
+      const token = generateToken();
+      updatePlaybackState({
+        status: 'generating',
+        generationToken: token,
+        chunks: response.chunks,
+        totalChunks: response.chunks.length,
+        currentChunkIndex: 0
+      });
+      console.log(`Stored ${response.chunks.length} chunks with token ${token}`);
+      // Include generation token in response for client use
+      response.generationToken = token;
+    }
+
     sendResponse(response);
   } catch (error) {
     console.error('Error routing to offscreen:', error);
@@ -206,6 +224,39 @@ async function routeToOffscreen(
     });
   }
 }
+
+/**
+ * Request chunk generation from offscreen document
+ * Returns base64-encoded audio data (not blob URL) for cross-origin transfer
+ *
+ * Note: This function is prepared for Plan 03 when full orchestration is implemented.
+ * The content script will receive the audio data and create its own blob URL.
+ */
+async function generateChunk(
+  chunkText: string,
+  voice: string,
+  chunkIndex: number,
+  totalChunks: number,
+  generationToken: string
+): Promise<{ success: boolean; audioData?: string; audioMimeType?: string; error?: string }> {
+  await ensureOffscreenDocument();
+
+  const response = await chrome.runtime.sendMessage({
+    target: 'offscreen',
+    type: MessageType.TTS_GENERATE_CHUNK,
+    text: chunkText,
+    voice,
+    chunkIndex,
+    totalChunks,
+    generationToken
+  });
+
+  return response;
+}
+
+// Export for potential future use (Plan 03)
+// TypeScript compile-time only - service workers don't have module exports
+void generateChunk;
 
 // Listen for download progress from offscreen and broadcast to popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
