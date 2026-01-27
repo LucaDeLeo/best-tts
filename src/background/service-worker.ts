@@ -34,6 +34,8 @@ import {
   type DeleteLibraryItemMessage,
   type GetRecentItemsMessage,
   type UpdateSettingsMessage,
+  type VoicePreviewMessage,
+  type VoicePreviewResponse,
 } from '../lib/messages';
 import {
   migrateSettings,
@@ -157,7 +159,8 @@ type ServiceWorkerMessage = TTSMessage
   | { type: 'page-count-warning'; target: 'service-worker'; extractionId: string; pageCount: number; threshold: number }
   | { type: 'get-settings'; target: 'service-worker' }
   | UpdateSettingsMessage
-  | { type: 'open-side-panel'; target: 'service-worker' };
+  | { type: 'open-side-panel'; target: 'service-worker' }
+  | VoicePreviewMessage;
 
 // Handle GET_TAB_ID requests - simple utility to let content script know its tab ID
 // This is used for rehydration logic to verify the content script is in the active playback tab
@@ -731,6 +734,12 @@ async function handleServiceWorkerMessage(
         break;
       }
 
+      case MessageType.VOICE_PREVIEW: {
+        const { voice } = message as VoicePreviewMessage;
+        await handleVoicePreviewRequest(voice, sendResponse);
+        break;
+      }
+
       default:
         sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
     }
@@ -738,6 +747,35 @@ async function handleServiceWorkerMessage(
     sendResponse({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+/**
+ * Handle voice preview request - forward to offscreen document
+ * Per CONTEXT.md Decision #5: Generate in offscreen, return audio data to side panel
+ */
+async function handleVoicePreviewRequest(
+  voice: string,
+  sendResponse: (response: VoicePreviewResponse) => void
+): Promise<void> {
+  try {
+    // Ensure offscreen document is ready
+    await ensureOffscreenDocument();
+
+    // Forward to offscreen
+    const response = await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: MessageType.VOICE_PREVIEW,
+      voice
+    }) as VoicePreviewResponse;
+
+    sendResponse(response);
+  } catch (error) {
+    console.error('Voice preview request failed:', error);
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Preview request failed'
     });
   }
 }
