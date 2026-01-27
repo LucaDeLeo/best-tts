@@ -11,6 +11,7 @@ import { TTSEngine, type VoiceId } from '../lib/tts-engine';
 import { setDownloadProgress, clearDownloadProgress, setCacheStatus } from '../lib/model-cache';
 import { getSelectedVoice } from '../lib/voice-storage';
 import { splitIntoChunks } from '../lib/text-chunker';
+import { extractTextFile } from '../lib/text-file-extractor';
 
 console.log('Best TTS offscreen document loaded');
 
@@ -284,13 +285,18 @@ async function handleExtractDocument(msg: OffscreenExtractMessage): Promise<Docu
         };
 
       case 'txt':
-      case 'md':
-        // Implemented in 06-03-PLAN.md
+      case 'md': {
+        const textResult = extractTextFile(data, filename);
+
         return {
-          success: false,
-          error: 'Text file extraction not yet implemented',
+          success: textResult.success,
+          text: textResult.text,
+          title: textResult.title || filename,
+          textLength: textResult.textLength,
+          error: textResult.error,
           extractionId
         };
+      }
 
       default:
         return {
