@@ -4,7 +4,8 @@ import {
   type SetSpeedMessage,
   type ExtractionResult,
   type InitHighlightingMessage,
-  type StatusUpdateMessage
+  type StatusUpdateMessage,
+  type ShowFloatingPlayerMessage
 } from '../lib/messages';
 import { getSelectedText, extractArticle } from '../lib/content-extractor';
 import type { HighlightState } from '../lib/highlight-types';
@@ -31,6 +32,9 @@ let highlightState: HighlightState | null = null;
 
 // Floating player instance
 let floatingPlayer: ReturnType<typeof createFloatingPlayer> | null = null;
+
+// Track if player was dismissed by user (stays hidden until restored or playback stops)
+let playerDismissed = false;
 
 // Chunk tracking for floating player progress display
 let currentChunkIndex: number = 0;
@@ -82,6 +86,9 @@ async function handleMessage(message: any): Promise<any> {
     case MessageType.STATUS_UPDATE:
       return handleStatusUpdate(message as StatusUpdateMessage);
 
+    case MessageType.SHOW_FLOATING_PLAYER:
+      return handleShowFloatingPlayer();
+
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };
   }
@@ -96,16 +103,23 @@ async function handlePlayAudio(msg: PlayAudioMessage): Promise<{ success: boolea
 
   // Initialize floating player if not exists
   if (!floatingPlayer) {
-    floatingPlayer = createFloatingPlayer();
+    floatingPlayer = createFloatingPlayer({
+      onDismiss: () => {
+        playerDismissed = true;
+      }
+    });
+    playerDismissed = false; // Reset on new player creation
   }
 
-  // Update player state to show playing
-  floatingPlayer.update({
-    status: 'playing',
-    currentChunk: chunkIndex,
-    totalChunks: totalChunks,
-    playbackSpeed: currentSpeed
-  });
+  // Update player state to show playing (only if not dismissed)
+  if (!playerDismissed) {
+    floatingPlayer.update({
+      status: 'playing',
+      currentChunk: chunkIndex,
+      totalChunks: totalChunks,
+      playbackSpeed: currentSpeed
+    });
+  }
 
   // Stop any existing playback
   await cleanupAudio();
@@ -481,34 +495,118 @@ async function handleStatusUpdate(message: StatusUpdateMessage): Promise<{ succe
   return { success: true };
 }
 
+/**
+ * Handle SHOW_FLOATING_PLAYER message from popup.
+ * Restores a dismissed floating player with fresh state from service worker.
+ */
+async function handleShowFloatingPlayer(): Promise<{ success: boolean }> {
+  // Reset dismissed state so player can show
+  playerDismissed = false;
+
+  if (floatingPlayer) {
+    // Fetch latest state from service worker before showing
+    // This ensures the UI reflects the current playback state
+    try {
+      const response = await chrome.runtime.sendMessage({
+        target: 'service-worker',
+        type: MessageType.GET_STATUS
+      });
+
+      if (response && response.success) {
+        // Map response to player status
+        let playerStatus: 'idle' | 'generating' | 'playing' | 'paused' = 'idle';
+        if (response.isPlaying) playerStatus = 'playing';
+        else if (response.isPaused) playerStatus = 'paused';
+        else if (response.isGenerating) playerStatus = 'generating';
+
+        // Update tracked state
+        currentChunkIndex = response.currentChunkIndex ?? currentChunkIndex;
+        currentTotalChunks = response.totalChunks ?? currentTotalChunks;
+        currentSpeed = response.playbackSpeed ?? currentSpeed;
+
+        // Update player UI
+        floatingPlayer.update({
+          status: playerStatus,
+          currentChunk: currentChunkIndex,
+          totalChunks: currentTotalChunks,
+          playbackSpeed: currentSpeed
+        });
+      }
+    } catch {
+      // Service worker might not be ready - show with cached state
+    }
+
+    // Explicitly show the player (in case update didn't show due to idle status)
+    floatingPlayer.show();
+  }
+
+  return { success: true };
+}
+
 // Cleanup highlighting on page unload
 window.addEventListener('beforeunload', () => {
   cleanupHighlighting();
 });
 
-// Request current state from service worker to sync floating player on load
-// This ensures the player shows correct state after page navigation/refresh
-chrome.runtime.sendMessage({
-  target: 'service-worker',
-  type: MessageType.GET_STATUS
-}).then((response) => {
-  if (response && response.success) {
-    // Construct a StatusUpdateMessage-like object from the GET_STATUS response
-    handleStatusUpdate({
-      target: 'content-script',
-      type: MessageType.STATUS_UPDATE,
-      status: {
-        initialized: response.initialized,
-        currentVoice: response.currentVoice,
-        isPlaying: response.isPlaying,
-        isPaused: response.isPaused,
-        isGenerating: response.isGenerating,
-        currentChunkIndex: response.currentChunkIndex,
-        totalChunks: response.totalChunks,
-        playbackSpeed: response.playbackSpeed
+// Request current state from service worker to rehydrate floating player on load
+// This handles: (1) page refresh, (2) hard navigation, (3) reopening tab with active playback
+// Per CONTEXT.md decision [15]: SW stores state, content script rehydrates on load
+(async function rehydrateFloatingPlayer() {
+  try {
+    // Get this tab's ID to verify we're the active playback tab
+    const tabIdResponse = await new Promise<{ tabId?: number }>((resolve) => {
+      chrome.runtime.sendMessage({ type: 'GET_TAB_ID' }, (response) => {
+        resolve(response || {});
+      });
+    });
+    const thisTabId = tabIdResponse.tabId;
+
+    // Get current playback state from service worker
+    const response = await chrome.runtime.sendMessage({
+      target: 'service-worker',
+      type: MessageType.GET_STATUS
+    });
+
+    if (!response || !response.success) return;
+
+    // Only rehydrate if this is the tab where playback is active
+    // This prevents other tabs from incorrectly showing the player
+    const isActiveInThisTab = (response.isPlaying || response.isPaused) &&
+                              response.activeTabId === thisTabId;
+
+    if (isActiveInThisTab && response.totalChunks > 0) {
+      // Rehydrate: create floating player and show current state
+      if (!floatingPlayer) {
+        floatingPlayer = createFloatingPlayer({
+          onDismiss: () => {
+            playerDismissed = true;
+          }
+        });
+        playerDismissed = false;
       }
-    } as StatusUpdateMessage);
+
+      // Update tracked state from service worker (authoritative source)
+      currentChunkIndex = response.currentChunkIndex ?? 0;
+      currentTotalChunks = response.totalChunks ?? 0;
+      currentSpeed = response.playbackSpeed ?? 1.0;
+
+      // Map status - note: after hard navigation, state will be 'paused'
+      // because the audio element was destroyed by navigation
+      let playerStatus: 'idle' | 'generating' | 'playing' | 'paused' = 'idle';
+      if (response.isPlaying) playerStatus = 'playing';
+      else if (response.isPaused) playerStatus = 'paused';
+      else if (response.isGenerating) playerStatus = 'generating';
+
+      floatingPlayer.update({
+        status: playerStatus,
+        currentChunk: currentChunkIndex,
+        totalChunks: currentTotalChunks,
+        playbackSpeed: currentSpeed
+      });
+
+      console.log('Rehydrated floating player:', playerStatus, currentChunkIndex + 1, '/', currentTotalChunks);
+    }
+  } catch {
+    // Service worker might not be ready - this is fine on initial load
   }
-}).catch(() => {
-  // Service worker might not be ready - this is fine on initial load
-});
+})();
