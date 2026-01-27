@@ -33,7 +33,13 @@ import {
   type GetLibraryItemsMessage,
   type DeleteLibraryItemMessage,
   type GetRecentItemsMessage,
+  type UpdateSettingsMessage,
 } from '../lib/messages';
+import {
+  migrateSettings,
+  getSettings,
+  updateSettings,
+} from '../lib/settings-storage';
 import {
   saveLibraryItem,
   isUrlSaved,
@@ -74,6 +80,13 @@ import { getSelectedVoice } from '../lib/voice-storage';
 import { splitIntoChunks } from '../lib/text-chunker';
 
 console.log('Best TTS service worker loaded');
+
+// Run settings migration on startup (one-time per install)
+migrateSettings().then(migrated => {
+  if (migrated) {
+    console.log('Settings migration completed on startup');
+  }
+});
 
 // Restore playback speed from storage on startup
 chrome.storage.local.get(['playbackSpeed']).then(({ playbackSpeed }) => {
@@ -134,7 +147,9 @@ type ServiceWorkerMessage = TTSMessage
   | DeleteLibraryItemMessage
   | GetRecentItemsMessage
   | { type: 'get-pending-warning'; target: 'service-worker' }
-  | { type: 'page-count-warning'; target: 'service-worker'; extractionId: string; pageCount: number; threshold: number };
+  | { type: 'page-count-warning'; target: 'service-worker'; extractionId: string; pageCount: number; threshold: number }
+  | { type: 'get-settings'; target: 'service-worker' }
+  | UpdateSettingsMessage;
 
 // Handle GET_TAB_ID requests - simple utility to let content script know its tab ID
 // This is used for rehydration logic to verify the content script is in the active playback tab
@@ -679,6 +694,20 @@ async function handleServiceWorkerMessage(
         const { limit = 5 } = message as GetRecentItemsMessage;
         const items = await getRecentItems(limit);
         sendResponse({ success: true, items });
+        break;
+      }
+
+      // Settings messages (Phase 8)
+      case MessageType.GET_SETTINGS: {
+        const settings = await getSettings();
+        sendResponse({ success: true, settings });
+        break;
+      }
+
+      case MessageType.UPDATE_SETTINGS: {
+        const { updates } = message as UpdateSettingsMessage;
+        const newSettings = await updateSettings(updates);
+        sendResponse({ success: true, settings: newSettings });
         break;
       }
 
