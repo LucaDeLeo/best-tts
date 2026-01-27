@@ -3,11 +3,25 @@
 
 import { getSettings, updateSettings, type Settings } from '../lib/settings-storage';
 import { VOICE_IDS, type VoiceId } from '../lib/tts-engine';
+import { MessageType } from '../lib/messages';
+import type { LibraryItem } from '../lib/library-types';
+import {
+  renderLibraryList,
+  renderFolderList,
+  createFolderSelect,
+  type FolderData,
+} from '../lib/ui/library-list';
 
 console.log('Side panel loaded');
 
 // State
 let currentSettings: Settings | null = null;
+
+// Library state
+let folders: FolderData[] = [];
+let libraryItems: LibraryItem[] = [];
+let currentFolderId: string | null = null;
+let selectedItemId: string | null = null;
 
 // DOM Elements
 const tabButtons = document.querySelectorAll('.tab-btn');
@@ -108,8 +122,28 @@ function applyTheme(darkMode: 'system' | 'light' | 'dark') {
 }
 
 /**
- * Load library tab content (placeholder for 08-04)
- * Uses safe DOM manipulation (createElement/appendChild)
+ * Send message to service worker
+ */
+async function sendToServiceWorker<T>(
+  type: string,
+  payload?: Record<string, unknown>
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { target: 'service-worker', type, ...payload },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      }
+    );
+  });
+}
+
+/**
+ * Load library tab content
  */
 async function loadLibraryTab() {
   const libraryTab = document.getElementById('library-tab');
@@ -120,11 +154,287 @@ async function loadLibraryTab() {
     libraryTab.removeChild(libraryTab.firstChild);
   }
 
-  // Placeholder - will be populated in 08-04
-  const placeholder = document.createElement('p');
-  placeholder.className = 'placeholder';
-  placeholder.textContent = 'Library content will load here';
-  libraryTab.appendChild(placeholder);
+  // Create layout structure
+  const layout = document.createElement('div');
+  layout.className = 'library-layout';
+
+  // Sidebar with folders
+  const sidebar = document.createElement('div');
+  sidebar.className = 'library-sidebar';
+
+  const foldersContainer = document.createElement('div');
+  foldersContainer.id = 'folders-container';
+  foldersContainer.className = 'folders-list';
+  sidebar.appendChild(foldersContainer);
+
+  // New folder input
+  const newFolderRow = document.createElement('div');
+  newFolderRow.className = 'new-folder-row';
+
+  const newFolderInput = document.createElement('input');
+  newFolderInput.type = 'text';
+  newFolderInput.id = 'new-folder-input';
+  newFolderInput.placeholder = 'New folder name';
+  newFolderInput.className = 'folder-input';
+  newFolderRow.appendChild(newFolderInput);
+
+  const createFolderBtn = document.createElement('button');
+  createFolderBtn.className = 'btn btn-primary small';
+  createFolderBtn.textContent = 'Add';
+  createFolderBtn.addEventListener('click', handleCreateFolder);
+  newFolderRow.appendChild(createFolderBtn);
+
+  newFolderInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleCreateFolder();
+  });
+
+  sidebar.appendChild(newFolderRow);
+  layout.appendChild(sidebar);
+
+  // Main content with items
+  const main = document.createElement('div');
+  main.className = 'library-main';
+
+  const itemsContainer = document.createElement('div');
+  itemsContainer.id = 'items-container';
+  itemsContainer.className = 'items-list';
+  main.appendChild(itemsContainer);
+
+  // Item actions bar (hidden by default)
+  const actionsBar = document.createElement('div');
+  actionsBar.id = 'item-actions-bar';
+  actionsBar.className = 'item-actions-bar hidden';
+  main.appendChild(actionsBar);
+
+  layout.appendChild(main);
+  libraryTab.appendChild(layout);
+
+  // Load data
+  await loadFolders();
+  await loadLibraryItems();
+}
+
+/**
+ * Load folders from service worker
+ */
+async function loadFolders() {
+  try {
+    const response = await sendToServiceWorker<{ success: boolean; folders: FolderData[] }>(
+      MessageType.FOLDER_LIST
+    );
+    if (response.success) {
+      folders = response.folders;
+      renderFolders();
+    }
+  } catch (error) {
+    console.error('Failed to load folders:', error);
+  }
+}
+
+/**
+ * Render folders in sidebar
+ */
+function renderFolders() {
+  const container = document.getElementById('folders-container');
+  if (!container) return;
+
+  renderFolderList(container, folders, currentFolderId, {
+    onFolderSelect: selectFolder,
+    onFolderRename: handleRenameFolder,
+    onFolderDelete: handleDeleteFolder,
+  });
+}
+
+/**
+ * Load library items for current folder
+ */
+async function loadLibraryItems() {
+  try {
+    const response = await sendToServiceWorker<{ success: boolean; items: LibraryItem[] }>(
+      MessageType.GET_LIBRARY_ITEMS,
+      { folderId: currentFolderId }
+    );
+    if (response.success) {
+      libraryItems = response.items;
+      renderItems();
+    }
+  } catch (error) {
+    console.error('Failed to load library items:', error);
+  }
+}
+
+/**
+ * Render library items
+ */
+function renderItems() {
+  const container = document.getElementById('items-container');
+  if (!container) return;
+
+  renderLibraryList(container, libraryItems, selectedItemId, {
+    onItemClick: selectItem,
+    onItemDelete: handleDeleteItem,
+    onItemMove: handleMoveItem,
+  });
+}
+
+/**
+ * Select a folder
+ */
+async function selectFolder(folderId: string | null) {
+  currentFolderId = folderId;
+  selectedItemId = null;
+  hideItemActions();
+  renderFolders();
+  await loadLibraryItems();
+}
+
+/**
+ * Select a library item
+ */
+function selectItem(itemId: string) {
+  selectedItemId = itemId;
+  renderItems();
+  showItemActions(itemId);
+}
+
+/**
+ * Show item actions bar
+ */
+function showItemActions(itemId: string) {
+  const bar = document.getElementById('item-actions-bar');
+  if (!bar) return;
+
+  const item = libraryItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  // Clear and rebuild
+  while (bar.firstChild) {
+    bar.removeChild(bar.firstChild);
+  }
+
+  // Move to folder dropdown
+  const moveLabel = document.createElement('label');
+  moveLabel.textContent = 'Move to: ';
+  bar.appendChild(moveLabel);
+
+  const folderSelect = createFolderSelect(folders, item.folderId, (folderId) => {
+    handleMoveItem(itemId, folderId);
+  });
+  bar.appendChild(folderSelect);
+
+  // Play button
+  const playBtn = document.createElement('button');
+  playBtn.className = 'btn btn-primary small';
+  playBtn.textContent = 'Play';
+  playBtn.disabled = item.contentDeleted;
+  playBtn.addEventListener('click', () => handlePlayItem(itemId));
+  bar.appendChild(playBtn);
+
+  // Delete button
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'btn btn-secondary small';
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.addEventListener('click', () => handleDeleteItem(itemId));
+  bar.appendChild(deleteBtn);
+
+  bar.classList.remove('hidden');
+}
+
+/**
+ * Hide item actions bar
+ */
+function hideItemActions() {
+  const bar = document.getElementById('item-actions-bar');
+  if (bar) {
+    bar.classList.add('hidden');
+  }
+}
+
+// Folder handlers
+async function handleCreateFolder() {
+  const input = document.getElementById('new-folder-input') as HTMLInputElement;
+  const name = input.value.trim();
+  if (!name) return;
+
+  try {
+    await sendToServiceWorker(MessageType.FOLDER_CREATE, { name });
+    input.value = '';
+    await loadFolders();
+  } catch (error) {
+    console.error('Failed to create folder:', error);
+  }
+}
+
+async function handleRenameFolder(folderId: string, currentName: string) {
+  const newName = prompt('Enter new folder name:', currentName);
+  if (!newName || newName.trim() === currentName) return;
+
+  try {
+    await sendToServiceWorker(MessageType.FOLDER_RENAME, { folderId, name: newName.trim() });
+    await loadFolders();
+  } catch (error) {
+    console.error('Failed to rename folder:', error);
+  }
+}
+
+async function handleDeleteFolder(folderId: string) {
+  if (!confirm('Delete this folder? Items will be moved to root.')) return;
+
+  try {
+    await sendToServiceWorker(MessageType.FOLDER_DELETE, { folderId });
+    if (currentFolderId === folderId) {
+      currentFolderId = null;
+    }
+    await loadFolders();
+    await loadLibraryItems();
+  } catch (error) {
+    console.error('Failed to delete folder:', error);
+  }
+}
+
+// Item handlers
+async function handlePlayItem(itemId: string) {
+  try {
+    const response = await sendToServiceWorker<{
+      success: boolean;
+      item: LibraryItem;
+      content: string;
+      error?: string;
+    }>(MessageType.PLAY_LIBRARY_ITEM, { itemId });
+
+    if (!response.success) {
+      alert(response.error || 'Failed to play item');
+      return;
+    }
+
+    // TODO: Start playback in a new tab or current tab
+    // For now, just show a message
+    alert(`Ready to play: ${response.item.title}\n\nOpen a webpage and click Play in popup to start.`);
+  } catch (error) {
+    console.error('Failed to play item:', error);
+  }
+}
+
+async function handleDeleteItem(itemId: string) {
+  if (!confirm('Delete this item from library?')) return;
+
+  try {
+    await sendToServiceWorker(MessageType.DELETE_LIBRARY_ITEM, { itemId });
+    selectedItemId = null;
+    hideItemActions();
+    await loadLibraryItems();
+  } catch (error) {
+    console.error('Failed to delete item:', error);
+  }
+}
+
+async function handleMoveItem(itemId: string, folderId: string | null) {
+  try {
+    await sendToServiceWorker(MessageType.ITEM_MOVE_TO_FOLDER, { itemId, folderId });
+    await loadLibraryItems();
+  } catch (error) {
+    console.error('Failed to move item:', error);
+  }
 }
 
 /**
