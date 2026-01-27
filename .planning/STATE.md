@@ -149,6 +149,10 @@ Recent decisions affecting current work:
 - (08-01) Side panel tab structure with Library and Settings sections
 - (08-01) Dark mode toggle with persistence to chrome.storage.local
 - (08-01) Safe DOM manipulation using createElement/appendChild (no innerHTML)
+- (08-02) CSS variables defined in theme.css, imported by shared.css
+- (08-02) System dark mode via @media (prefers-color-scheme: dark)
+- (08-02) .dark-mode class on root for explicit toggle, .light-mode escape hatch
+- (08-02) CSS import chain: component.css -> shared.css -> theme.css
 - (08-03) Settings stored in consolidated 'settings' key in chrome.storage.local
 - (08-03) Migration runs once on service worker load, deletes legacy keys after migration
 - (08-03) ShortcutBindings interface for in-panel keyboard shortcuts (not global Chrome shortcuts)
