@@ -37,6 +37,10 @@ export const MessageType = {
   // Generation control
   TTS_GENERATE_CHUNK: 'tts-generate-chunk',  // Generate single chunk
   CHUNK_READY: 'chunk-ready',     // Chunk audio ready (offscreen -> sw)
+
+  // Content extraction
+  EXTRACT_SELECTION: 'extract-selection',     // Get selected text
+  EXTRACT_ARTICLE: 'extract-article',         // Full-page Readability extraction
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -159,6 +163,28 @@ export interface ChunkReadyMessage extends BaseMessage {
   generationToken: string;
 }
 
+// Content extraction messages
+export interface ExtractSelectionMessage extends BaseMessage {
+  type: typeof MessageType.EXTRACT_SELECTION;
+}
+
+export interface ExtractArticleMessage extends BaseMessage {
+  type: typeof MessageType.EXTRACT_ARTICLE;
+}
+
+/**
+ * Result returned from content extraction operations.
+ * Used as sendResponse payload, not as a routable message.
+ */
+export interface ExtractionResult {
+  success: boolean;
+  text?: string;           // Extracted text content
+  title?: string;          // Page/article title
+  url?: string;            // Page URL
+  error?: string;          // Error message if failed
+  source: 'selection' | 'article';  // What was extracted
+}
+
 // Union type for all messages
 export type TTSMessage =
   | TTSInitMessage
@@ -179,7 +205,9 @@ export type TTSMessage =
   | HeartbeatMessage
   | SkipToChunkMessage
   | TTSGenerateChunkMessage
-  | ChunkReadyMessage;
+  | ChunkReadyMessage
+  | ExtractSelectionMessage
+  | ExtractArticleMessage;
 
 // Response types
 export interface TTSResponse {
