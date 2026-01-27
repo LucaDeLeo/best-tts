@@ -108,6 +108,10 @@ Recent decisions affecting current work:
 - (05-03) SW owns authoritative state, content script holds derived/cached copy
 - (05-03) GET_STATUS returns explicit boolean fields for UI sync (isPlaying, isPaused, isGenerating)
 - (05-03) Content script requests initial state on load for page refresh sync
+- (05-04) Dismiss hides player without stopping playback (per CONTEXT.md decision [7])
+- (05-04) playerDismissed state resets on stop or idle status
+- (05-04) Show Player button in popup restores dismissed floating player
+- (05-04) Overlay close triggers STOP_PLAYBACK to service worker
 - (05-05) tabs.onUpdated marks state as 'paused' on hard navigation (audio destroyed)
 - (05-05) tabs.onRemoved resets playback state when active tab closes
 - (05-05) GET_TAB_ID utility message for content script tab verification
@@ -126,8 +130,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-27T09:03:30Z
-Stopped at: Completed 05-05-PLAN.md (Navigation Persistence) - Phase 5 complete
+Last session: 2026-01-27T09:05:35Z
+Stopped at: Completed 05-04-PLAN.md (Dismiss/Minimize) - Phase 5 complete
 Resume file: None
 
 ---
