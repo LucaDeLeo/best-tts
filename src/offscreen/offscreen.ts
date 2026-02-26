@@ -330,8 +330,9 @@ async function handleInit(): Promise<TTSResponse> {
     await TTSEngine.getInstance((progress) => {
       // Handle different progress statuses
       if (progress.status === 'progress' && progress.file) {
+        // Note: progress.progress is already a percentage (0-100), not a fraction (0-1)
         const percent = progress.progress
-          ? Math.round(progress.progress * 100)
+          ? Math.round(progress.progress)
           : progress.loaded && progress.total
             ? Math.round((progress.loaded / progress.total) * 100)
             : 0;

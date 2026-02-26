@@ -1,6 +1,19 @@
-import { KokoroTTS } from 'kokoro-js';
-import * as ort from 'onnxruntime-web';
+// CRITICAL: Import ONNX setup FIRST before any module that uses transformers.js
+// This configures onnxruntime-web wasmPaths before transformers.js checks it.
+// Without this, transformers.js defaults to loading from jsdelivr CDN which violates CSP.
+import './onnx-setup';
+
+// Now we can safely import transformers.js env (after onnx-setup has configured it)
 import { env } from '@huggingface/transformers';
+
+// Configure additional transformers.js settings
+env.useBrowserCache = true;        // Enable browser caching (IndexedDB)
+env.useCustomCache = false;        // Don't use custom cache (use browser default)
+env.cacheDir = '';                 // Use browser's default IndexedDB location
+env.allowLocalModels = false;      // We download from HuggingFace, not local files
+
+// Import kokoro-js (which depends on transformers.js, now properly configured)
+import { KokoroTTS } from 'kokoro-js';
 
 // Voice ID type - all available Kokoro voices
 // Using a const assertion to get the exact literal types
@@ -14,19 +27,6 @@ export const VOICE_IDS = [
 ] as const;
 
 export type VoiceId = (typeof VOICE_IDS)[number];
-
-// Configure ONNX Runtime for extension context
-// Must be done before any model loading
-ort.env.wasm.wasmPaths = chrome.runtime.getURL('assets/');
-ort.env.wasm.numThreads = 1; // Single-threaded to avoid cross-origin isolation issues
-
-// CRITICAL: Configure transformers.js caching for extension context
-// By default, transformers.js may use Cache API which can fail in extension contexts.
-// Force IndexedDB storage backend to ensure offline capability after initial download.
-env.useBrowserCache = true;        // Enable browser caching (IndexedDB)
-env.useCustomCache = false;        // Don't use custom cache (use browser default)
-env.cacheDir = '';                 // Use browser's default IndexedDB location
-env.allowLocalModels = false;      // We download from HuggingFace, not local files
 
 // Progress callback type
 export type ProgressCallback = (progress: {
@@ -71,8 +71,9 @@ class TTSEngineClass {
         progress_callback: (progress) => {
           // Log progress for debugging
           if (progress.status === 'progress') {
+            // Note: progress.progress is already a percentage (0-100), not a fraction (0-1)
             const percent = progress.progress
-              ? Math.round(progress.progress * 100)
+              ? Math.round(progress.progress)
               : Math.round((progress.loaded! / progress.total!) * 100);
             console.log(`Loading ${progress.file}: ${percent}%`);
           }

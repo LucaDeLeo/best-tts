@@ -6,6 +6,19 @@ import manifest from './src/manifest.json';
 
 export default defineConfig({
   root: 'src',
+  optimizeDeps: {
+    // Force bundle ONNX runtime to avoid dynamic imports from CDN
+    include: ['onnxruntime-web'],
+    esbuildOptions: {
+      target: 'esnext',
+    },
+  },
+  resolve: {
+    // CRITICAL: Deduplicate onnxruntime-web to ensure single instance
+    // Without this, transformers.js bundles its own copy and our
+    // wasmPaths config doesn't affect it
+    dedupe: ['onnxruntime-web', 'onnxruntime-common'],
+  },
   plugins: [
     crx({ manifest }),
     viteStaticCopy({
@@ -14,6 +27,12 @@ export default defineConfig({
           // Copy ONNX Runtime WASM files to assets/
           // Note: ../node_modules because vite root is 'src'
           src: '../node_modules/onnxruntime-web/dist/*.wasm',
+          dest: 'assets'
+        },
+        {
+          // Copy ONNX Runtime JavaScript modules for WASM backend
+          // transformers.js dynamically imports these, they must be available locally
+          src: '../node_modules/onnxruntime-web/dist/ort-wasm*.mjs',
           dest: 'assets'
         },
         {
