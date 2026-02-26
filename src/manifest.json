@@ -5,11 +5,6 @@
   "description": "High-quality local TTS",
   "permissions": ["offscreen", "storage", "activeTab", "scripting", "contextMenus", "notifications", "sidePanel"],
   "host_permissions": [
-    "https://huggingface.co/*",
-    "https://*.huggingface.co/*",
-    "https://cdn-lfs.huggingface.co/*",
-    "https://cdn-lfs-us-1.huggingface.co/*",
-    "https://cdn.jsdelivr.net/*",
     "<all_urls>"
   ],
   "background": {
@@ -32,6 +27,7 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
   },
+  "_comment_csp": "wasm-unsafe-eval is required for ONNX Runtime WASM inference (Kokoro TTS model). Without it, WebAssembly.instantiate fails in extension pages.",
   "side_panel": {
     "default_path": "sidepanel/index.html"
   },

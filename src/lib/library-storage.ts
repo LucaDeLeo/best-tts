@@ -293,14 +293,23 @@ export async function getFolders(): Promise<LibraryFolder[]> {
 
 /**
  * Hash content using SHA-256.
- * Uses Web Crypto API for browser-native, secure hashing.
+ * Uses Web Crypto API when available, with DJB2 fallback for insecure (HTTP) contexts.
  */
 export async function hashContent(content: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(content);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    // Fallback DJB2 hash for insecure contexts (HTTP content scripts)
+    let hash = 5381;
+    for (let i = 0; i < content.length; i++) {
+      hash = ((hash << 5) + hash + content.charCodeAt(i)) | 0;
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  }
 }
 
 /**
@@ -353,46 +362,3 @@ export async function getStorageEstimateForLibrary(): Promise<StorageEstimate | 
   }
 }
 
-// ============================================
-// Error Handling & Retry Logic
-// ============================================
-
-/**
- * Check if an error is transient and can be retried.
- */
-function isTransientError(error: Error): boolean {
-  return error.name === 'AbortError' || error.name === 'InvalidStateError';
-}
-
-/**
- * Sleep for a given duration.
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Execute an operation with retry logic for transient errors.
- * Uses exponential backoff: 100ms, 200ms, 400ms.
- */
-export async function withRetry<T>(
-  operation: () => Promise<T>,
-  maxRetries = 3
-): Promise<T> {
-  let lastError: Error | null = null;
-
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (error instanceof Error && isTransientError(error)) {
-        lastError = error;
-        await sleep(100 * Math.pow(2, i)); // Exponential backoff
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  throw lastError;
-}

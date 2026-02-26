@@ -4,6 +4,9 @@
 import { getSettings, updateSettings, type Settings } from '../lib/settings-storage';
 import { VOICE_IDS, type VoiceId } from '../lib/tts-engine';
 import { MessageType } from '../lib/messages';
+import { formatVoiceName, GRADE_A_VOICES, formatVoiceDisplayName } from '../lib/voice-storage';
+import { sendToServiceWorker } from '../lib/messaging';
+import type { MlxServerStatus } from '../lib/mlx-audio-client';
 import type { LibraryItem } from '../lib/library-types';
 import {
   renderLibraryList,
@@ -12,7 +15,7 @@ import {
   type FolderData,
 } from '../lib/ui/library-list';
 
-console.log('Side panel loaded');
+// Side panel loaded
 
 // State
 let currentSettings: Settings | null = null;
@@ -49,7 +52,6 @@ async function init() {
   // Load initial tab content
   await loadLibraryTab();
 
-  console.log('Side panel initialized');
 }
 
 /**
@@ -122,27 +124,6 @@ function applyTheme(darkMode: 'system' | 'light' | 'dark') {
       html.classList.add('dark-mode');
     }
   }
-}
-
-/**
- * Send message to service worker
- */
-async function sendToServiceWorker<T>(
-  type: string,
-  payload?: Record<string, unknown>
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(
-      { target: 'service-worker', type, ...payload },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(response);
-        }
-      }
-    );
-  });
 }
 
 /**
@@ -369,6 +350,7 @@ async function handleCreateFolder() {
 }
 
 async function handleRenameFolder(folderId: string, currentName: string) {
+  // TODO: Replace prompt() with custom modal for better UX
   const newName = prompt('Enter new folder name:', currentName);
   if (!newName || newName.trim() === currentName) return;
 
@@ -381,6 +363,7 @@ async function handleRenameFolder(folderId: string, currentName: string) {
 }
 
 async function handleDeleteFolder(folderId: string) {
+  // TODO: Replace confirm() with custom modal for better UX
   if (!confirm('Delete this folder? Items will be moved to root.')) return;
 
   try {
@@ -402,23 +385,63 @@ async function handlePlayItem(itemId: string) {
       success: boolean;
       item: LibraryItem;
       content: string;
+      contentHash?: string;
+      startChunkIndex?: number;
       error?: string;
     }>(MessageType.PLAY_LIBRARY_ITEM, { itemId });
 
     if (!response.success) {
-      alert(response.error || 'Failed to play item');
+      showStatusMessage(response.error || 'Failed to play item', 'error');
       return;
     }
 
-    // TODO: Start playback in a new tab or current tab
-    // For now, just show a message
-    alert(`Ready to play: ${response.item.title}\n\nOpen a webpage and click Play in popup to start.`);
+    // Store as pending extraction so popup picks it up, then start TTS
+    // via service worker's TTS_GENERATE which handles chunking + playback
+    const ttsResponse = await sendToServiceWorker<{ success: boolean; error?: string }>(
+      MessageType.TTS_GENERATE,
+      {
+        text: response.content,
+        voice: currentSettings?.voice || 'af_heart',
+        libraryItemId: itemId,
+        libraryContentHash: response.contentHash || '',
+        libraryContentLength: response.content.length,
+        startChunkIndex: response.startChunkIndex
+      }
+    );
+
+    if (!ttsResponse.success) {
+      showStatusMessage(ttsResponse.error || 'Failed to start playback', 'error');
+      return;
+    }
+
+    showStatusMessage(`Playing: ${response.item.title}`, 'success');
   } catch (error) {
     console.error('Failed to play item:', error);
+    showStatusMessage('Failed to play item', 'error');
+  }
+}
+
+/**
+ * Show a temporary status message in the library tab
+ */
+function showStatusMessage(text: string, type: 'success' | 'error') {
+  const existing = document.getElementById('library-status-msg');
+  if (existing) existing.remove();
+
+  const msg = document.createElement('div');
+  msg.id = 'library-status-msg';
+  msg.className = `library-status ${type}`;
+  msg.textContent = text;
+
+  const libraryTab = document.getElementById('library-tab');
+  if (libraryTab) {
+    libraryTab.insertBefore(msg, libraryTab.firstChild);
+    setTimeout(() => msg.remove(), 3000);
   }
 }
 
 async function handleDeleteItem(itemId: string) {
+  // TODO: Replace confirm() with custom modal for better UX
   if (!confirm('Delete this item from library?')) return;
 
   try {
@@ -455,40 +478,122 @@ async function loadSettingsTab() {
   // Load current settings
   currentSettings = await getSettings();
 
-  // Voice selection section
+  // ── Engine section ──────────────────────────────────────
+  const engineSection = createSettingsSection('Engine', 'Choose your TTS engine');
+
+  const engineSelect = document.createElement('select');
+  engineSelect.id = 'engine-select';
+  engineSelect.className = 'settings-select';
+
+  const engineOptions = [
+    { value: 'kokoro', label: 'Kokoro (local, zero setup)' },
+    { value: 'mlx-audio', label: 'mlx-audio (local server)' },
+  ];
+
+  for (const opt of engineOptions) {
+    const option = document.createElement('option');
+    option.value = opt.value;
+    option.textContent = opt.label;
+    if (opt.value === currentSettings.engine) option.selected = true;
+    engineSelect.appendChild(option);
+  }
+
+  engineSection.appendChild(engineSelect);
+
+  // mlx-audio controls container (shown/hidden based on engine)
+  const mlxControls = document.createElement('div');
+  mlxControls.id = 'mlx-controls';
+  mlxControls.className = currentSettings.engine === 'mlx-audio' ? '' : 'hidden';
+
+  // Server status row
+  const statusRow = document.createElement('div');
+  statusRow.className = 'mlx-status-row';
+
+  const statusDot = document.createElement('span');
+  statusDot.id = 'mlx-status-dot';
+  statusDot.className = 'status-dot checking';
+
+  const statusText = document.createElement('span');
+  statusText.id = 'mlx-status-text';
+  statusText.className = 'mlx-status-text';
+  statusText.textContent = 'Checking...';
+
+  const refreshBtn = document.createElement('button');
+  refreshBtn.className = 'btn btn-secondary small';
+  refreshBtn.textContent = 'Refresh';
+  refreshBtn.addEventListener('click', refreshMlxStatus);
+
+  statusRow.appendChild(statusDot);
+  statusRow.appendChild(statusText);
+  statusRow.appendChild(refreshBtn);
+  mlxControls.appendChild(statusRow);
+
+  // Server URL input
+  const urlLabel = document.createElement('label');
+  urlLabel.className = 'settings-label';
+  urlLabel.textContent = 'Server URL';
+  mlxControls.appendChild(urlLabel);
+
+  const urlInput = document.createElement('input');
+  urlInput.id = 'mlx-url-input';
+  urlInput.type = 'text';
+  urlInput.className = 'settings-input';
+  urlInput.value = currentSettings.mlxAudioUrl;
+  urlInput.placeholder = 'http://localhost:8000';
+
+  let urlDebounce: ReturnType<typeof setTimeout>;
+  urlInput.addEventListener('input', () => {
+    clearTimeout(urlDebounce);
+    urlDebounce = setTimeout(async () => {
+      await updateSettings({ mlxAudioUrl: urlInput.value.trim() });
+      refreshMlxStatus();
+    }, 600);
+  });
+  mlxControls.appendChild(urlInput);
+
+  // Model select
+  const modelLabel = document.createElement('label');
+  modelLabel.className = 'settings-label';
+  modelLabel.textContent = 'Model';
+  mlxControls.appendChild(modelLabel);
+
+  const modelSelect = document.createElement('select');
+  modelSelect.id = 'mlx-model-select';
+  modelSelect.className = 'settings-select';
+  mlxControls.appendChild(modelSelect);
+
+  modelSelect.addEventListener('change', async () => {
+    await updateSettings({ mlxAudioModel: modelSelect.value });
+    // Refresh voice list for selected model
+    await refreshVoiceDropdown();
+  });
+
+  engineSection.appendChild(mlxControls);
+  settingsTab.appendChild(engineSection);
+
+  engineSelect.addEventListener('change', async () => {
+    const engine = engineSelect.value as Settings['engine'];
+    await updateSettings({ engine });
+    currentSettings = await getSettings();
+
+    if (engine === 'mlx-audio') {
+      mlxControls.classList.remove('hidden');
+      refreshMlxStatus();
+    } else {
+      mlxControls.classList.add('hidden');
+    }
+    refreshVoiceDropdown();
+  });
+
+  // ── Voice section ───────────────────────────────────────
   const voiceSection = createSettingsSection('Voice', 'Select the voice for text-to-speech');
 
   const voiceSelect = document.createElement('select');
   voiceSelect.id = 'voice-select';
   voiceSelect.className = 'settings-select';
-
-  // Populate voices - Grade A voices shown first
-  const gradeAVoices = ['af_heart', 'af_bella', 'af_nicole', 'af_sarah', 'af_sky', 'am_adam', 'am_michael'];
-  const sortedVoices = [...VOICE_IDS].sort((a, b) => {
-    const aIsA = gradeAVoices.includes(a);
-    const bIsA = gradeAVoices.includes(b);
-    if (aIsA && !bIsA) return -1;
-    if (!aIsA && bIsA) return 1;
-    return a.localeCompare(b);
-  });
-
-  for (const voiceId of sortedVoices) {
-    const option = document.createElement('option');
-    option.value = voiceId;
-    option.textContent = formatVoiceName(voiceId, gradeAVoices.includes(voiceId));
-    if (voiceId === currentSettings.voice) {
-      option.selected = true;
-    }
-    voiceSelect.appendChild(option);
-  }
-
-  voiceSelect.addEventListener('change', async () => {
-    await updateSettings({ voice: voiceSelect.value as VoiceId });
-  });
-
   voiceSection.appendChild(voiceSelect);
 
-  // Voice preview button (will be fully implemented in 08-06)
+  // Voice preview button
   const previewBtn = document.createElement('button');
   previewBtn.id = 'voice-preview-btn';
   previewBtn.className = 'btn btn-secondary small';
@@ -499,7 +604,15 @@ async function loadSettingsTab() {
 
   settingsTab.appendChild(voiceSection);
 
-  // Speed section
+  // Populate voice dropdown for current engine
+  await refreshVoiceDropdown();
+
+  // If mlx-audio is selected, trigger initial status check
+  if (currentSettings.engine === 'mlx-audio') {
+    refreshMlxStatus();
+  }
+
+  // ── Speed section ───────────────────────────────────────
   const speedSection = createSettingsSection('Playback Speed', 'Adjust the reading speed');
 
   const speedRow = document.createElement('div');
@@ -530,7 +643,7 @@ async function loadSettingsTab() {
   speedSection.appendChild(speedRow);
   settingsTab.appendChild(speedSection);
 
-  // Theme section
+  // ── Theme section ───────────────────────────────────────
   const themeSection = createSettingsSection('Theme', 'Choose your preferred color scheme');
 
   const themeSelect = document.createElement('select');
@@ -562,7 +675,7 @@ async function loadSettingsTab() {
   themeSection.appendChild(themeSelect);
   settingsTab.appendChild(themeSection);
 
-  // Keyboard shortcuts section
+  // ── Keyboard shortcuts section ──────────────────────────
   const shortcutsSection = createSettingsSection(
     'Keyboard Shortcuts',
     'Shortcuts for controlling playback'
@@ -615,7 +728,7 @@ async function loadSettingsTab() {
   shortcutsSection.appendChild(shortcutsNote);
   settingsTab.appendChild(shortcutsSection);
 
-  // About section
+  // ── About section ───────────────────────────────────────
   const aboutSection = createSettingsSection('About', '');
   const version = document.createElement('p');
   version.className = 'about-text';
@@ -628,6 +741,148 @@ async function loadSettingsTab() {
   aboutSection.appendChild(description);
 
   settingsTab.appendChild(aboutSection);
+}
+
+/**
+ * Handle voice selection change — routes to correct setting based on engine
+ */
+async function handleVoiceSelectChange() {
+  const voiceSelect = document.getElementById('voice-select') as HTMLSelectElement;
+  if (!voiceSelect) return;
+
+  const settings = currentSettings || await getSettings();
+  if (settings.engine === 'mlx-audio') {
+    await updateSettings({ mlxAudioVoice: voiceSelect.value });
+  } else {
+    await updateSettings({ voice: voiceSelect.value as VoiceId });
+  }
+}
+
+// Track whether voice select listener is attached
+let voiceSelectListenerAttached = false;
+
+/**
+ * Refresh the voice dropdown based on current engine
+ */
+async function refreshVoiceDropdown() {
+  const voiceSelect = document.getElementById('voice-select') as HTMLSelectElement;
+  if (!voiceSelect) return;
+
+  // Attach change handler once
+  if (!voiceSelectListenerAttached) {
+    voiceSelect.addEventListener('change', handleVoiceSelectChange);
+    voiceSelectListenerAttached = true;
+  }
+
+  // Clear existing options
+  while (voiceSelect.firstChild) {
+    voiceSelect.removeChild(voiceSelect.firstChild);
+  }
+
+  const settings = currentSettings || await getSettings();
+
+  if (settings.engine === 'mlx-audio') {
+    // Get voices for current mlx-audio model
+    const model = settings.mlxAudioModel;
+    if (!model) {
+      const placeholder = document.createElement('option');
+      placeholder.textContent = 'Select a model first';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      voiceSelect.appendChild(placeholder);
+      return;
+    }
+
+    const response = await sendToServiceWorker<{ success: boolean; voices: string[] }>(
+      MessageType.MLX_LIST_VOICES,
+      { model }
+    );
+
+    if (response.success && response.voices) {
+      for (const voiceId of response.voices) {
+        const option = document.createElement('option');
+        option.value = voiceId;
+        option.textContent = formatVoiceDisplayName(voiceId, 'mlx-audio');
+        if (voiceId === settings.mlxAudioVoice) option.selected = true;
+        voiceSelect.appendChild(option);
+      }
+    }
+  } else {
+    // Kokoro voices - Grade A first
+    const sortedVoices = [...VOICE_IDS].sort((a, b) => {
+      const aIsA = GRADE_A_VOICES.includes(a);
+      const bIsA = GRADE_A_VOICES.includes(b);
+      if (aIsA && !bIsA) return -1;
+      if (!aIsA && bIsA) return 1;
+      return a.localeCompare(b);
+    });
+
+    for (const voiceId of sortedVoices) {
+      const option = document.createElement('option');
+      option.value = voiceId;
+      option.textContent = formatVoiceName(voiceId, GRADE_A_VOICES.includes(voiceId));
+      if (voiceId === settings.voice) option.selected = true;
+      voiceSelect.appendChild(option);
+    }
+  }
+}
+
+/**
+ * Refresh mlx-audio server status, populate model dropdown
+ */
+async function refreshMlxStatus() {
+  const dot = document.getElementById('mlx-status-dot');
+  const text = document.getElementById('mlx-status-text');
+  const modelSelect = document.getElementById('mlx-model-select') as HTMLSelectElement;
+
+  if (dot) { dot.className = 'status-dot checking'; }
+  if (text) { text.textContent = 'Checking...'; }
+
+  try {
+    const response = await sendToServiceWorker<{
+      success: boolean;
+      online: boolean;
+      models: string[];
+      error?: string;
+    }>(MessageType.MLX_SERVER_STATUS);
+
+    if (response.online) {
+      if (dot) dot.className = 'status-dot connected';
+      if (text) text.textContent = `Connected (${response.models.length} model${response.models.length !== 1 ? 's' : ''})`;
+
+      // Populate model dropdown
+      if (modelSelect) {
+        while (modelSelect.firstChild) {
+          modelSelect.removeChild(modelSelect.firstChild);
+        }
+
+        const settings = currentSettings || await getSettings();
+        for (const modelId of response.models) {
+          const option = document.createElement('option');
+          option.value = modelId;
+          option.textContent = modelId;
+          if (modelId === settings.mlxAudioModel) option.selected = true;
+          modelSelect.appendChild(option);
+        }
+
+        // Auto-select first model if none set
+        if (!settings.mlxAudioModel && response.models.length > 0) {
+          modelSelect.value = response.models[0];
+          await updateSettings({ mlxAudioModel: response.models[0] });
+          currentSettings = await getSettings();
+        }
+      }
+
+      // Refresh voice dropdown with model-appropriate voices
+      await refreshVoiceDropdown();
+    } else {
+      if (dot) dot.className = 'status-dot disconnected';
+      if (text) text.textContent = response.error || 'Server not running';
+    }
+  } catch (error) {
+    if (dot) dot.className = 'status-dot disconnected';
+    if (text) text.textContent = 'Failed to check server';
+  }
 }
 
 /**
@@ -650,30 +905,6 @@ function createSettingsSection(title: string, description: string): HTMLElement 
   }
 
   return section;
-}
-
-/**
- * Format voice ID to display name
- */
-function formatVoiceName(voiceId: string, isHighQuality: boolean): string {
-  const parts = voiceId.split('_');
-  if (parts.length !== 2) return voiceId;
-
-  const [prefix, name] = parts;
-  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-
-  const accents: Record<string, string> = { 'a': 'American', 'b': 'British' };
-  const genders: Record<string, string> = { 'f': 'Female', 'm': 'Male' };
-
-  const accent = accents[prefix[0]] || '';
-  const gender = genders[prefix[1]] || '';
-
-  let display = capitalizedName;
-  if (accent && gender) {
-    display = `${capitalizedName} (${accent} ${gender})`;
-  }
-
-  return isHighQuality ? `${display} - High Quality` : display;
 }
 
 /**

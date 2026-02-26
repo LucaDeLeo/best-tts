@@ -33,8 +33,12 @@ export async function ensureOffscreenDocument(): Promise<void> {
     justification: 'TTS inference via WASM and audio playback'
   });
 
-  await creating;
-  creating = null;
+  try {
+    await creating;
+  } finally {
+    // Always clear so future callers can retry after failures.
+    creating = null;
+  }
 }
 
 /**

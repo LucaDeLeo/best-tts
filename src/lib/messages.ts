@@ -113,6 +113,10 @@ export const MessageType = {
 
   // Voice preview (Phase 8)
   VOICE_PREVIEW: 'voice-preview',
+
+  // mlx-audio engine
+  MLX_SERVER_STATUS: 'mlx-server-status',
+  MLX_LIST_VOICES: 'mlx-list-voices',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -136,6 +140,8 @@ export interface TTSGenerateMessage extends BaseMessage {
   libraryItemId?: string;
   libraryContentHash?: string;
   libraryContentLength?: number;
+  // Resume position for library playback
+  startChunkIndex?: number;
 }
 
 export interface TTSStopMessage extends BaseMessage {
@@ -170,6 +176,11 @@ export interface StatusUpdateMessage extends BaseMessage {
     initialized: boolean;
     currentVoice?: string;
     isPlaying?: boolean;
+    isGenerating?: boolean;
+    isPaused?: boolean;
+    currentChunkIndex?: number;
+    totalChunks?: number;
+    playbackSpeed?: number;
   };
 }
 
@@ -183,6 +194,7 @@ export interface PlayAudioMessage extends BaseMessage {
   generationToken: string;
   chunkIndex: number;     // Index for highlighting
   totalChunks: number;    // Total chunks for progress
+  chunkText?: string;     // First 100 chars of chunk text for autosave resume matching
   // Library context for autosave (Phase 7)
   libraryItemId?: string;
   libraryContentHash?: string;
@@ -369,6 +381,17 @@ export interface VoicePreviewMessage extends BaseMessage {
   voice: string;
 }
 
+// mlx-audio messages
+export interface MlxServerStatusMessage extends BaseMessage {
+  type: typeof MessageType.MLX_SERVER_STATUS;
+  baseUrl?: string;  // optional override; uses settings default if omitted
+}
+
+export interface MlxListVoicesMessage extends BaseMessage {
+  type: typeof MessageType.MLX_LIST_VOICES;
+  model: string;
+}
+
 /**
  * Result returned from content extraction operations.
  * Used as sendResponse payload, not as a routable message.
@@ -423,7 +446,9 @@ export type TTSMessage =
   | GetRecentItemsMessage
   | GetSettingsMessage
   | UpdateSettingsMessage
-  | VoicePreviewMessage;
+  | VoicePreviewMessage
+  | MlxServerStatusMessage
+  | MlxListVoicesMessage;
 
 // Response types
 export interface TTSResponse {

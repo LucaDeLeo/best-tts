@@ -11,9 +11,9 @@
 import type {
   HighlightState,
   TextNodeOffset,
-  SegmentBoundary,
   SplitNodeRecord
 } from './highlight-types';
+import { groupSentences } from './text-chunker';
 import {
   getSegmentationLocale,
   segmentSentences,
@@ -56,10 +56,33 @@ function buildTextNodeOffsetMap(range: Range): {
 
   while ((node = walker.nextNode() as Text | null)) {
     const nodeText = node.textContent || '';
+    let nodeSelectedStart = 0;
+    let nodeSelectedEnd = nodeText.length;
+
+    // Clip first/last text nodes to the exact range boundaries.
+    // Without this, we can accidentally include unselected node text.
+    if (node === range.startContainer) {
+      nodeSelectedStart = Math.max(0, Math.min(range.startOffset, nodeText.length));
+    }
+    if (node === range.endContainer) {
+      nodeSelectedEnd = Math.max(0, Math.min(range.endOffset, nodeText.length));
+    }
+
+    if (nodeSelectedStart >= nodeSelectedEnd) continue;
+
+    const selectedText = nodeText.slice(nodeSelectedStart, nodeSelectedEnd);
+    if (!selectedText) continue;
+
     const start = cumulativeOffset;
-    const end = start + nodeText.length;
-    offsets.push({ node, startOffset: start, endOffset: end });
-    textParts.push(nodeText);
+    const end = start + selectedText.length;
+    offsets.push({
+      node,
+      startOffset: start,
+      endOffset: end,
+      nodeSelectedStart,
+      nodeSelectedEnd
+    });
+    textParts.push(selectedText);
     cumulativeOffset = end;
   }
 
@@ -81,9 +104,14 @@ function findIntersectingNodes(
     if (offset.endOffset <= segmentStart) continue; // Node is before segment
     if (offset.startOffset >= segmentEnd) break;    // Node is after segment, done
 
-    // Calculate local offsets within this text node
-    const localStart = Math.max(0, segmentStart - offset.startOffset);
-    const localEnd = Math.min(offset.node.length, segmentEnd - offset.startOffset);
+    // Calculate offsets within the selected slice, then map back to original node offsets.
+    const selectedLength = offset.endOffset - offset.startOffset;
+    const segmentLocalStart = Math.max(0, segmentStart - offset.startOffset);
+    const segmentLocalEnd = Math.min(selectedLength, segmentEnd - offset.startOffset);
+    const localStart = offset.nodeSelectedStart + segmentLocalStart;
+    const localEnd = offset.nodeSelectedStart + segmentLocalEnd;
+
+    if (localStart >= localEnd) continue;
 
     result.push({ node: offset.node, localStart, localEnd });
   }
@@ -177,47 +205,61 @@ export function createSelectionHighlighting(selection: Selection): {
   const locale = getSegmentationLocale();
   const segments = segmentSentences(text, locale);
 
-  const spanGroups: HTMLSpanElement[][] = [];
-  const chunks: string[] = [];
   const splitRecords: SplitNodeRecord[] = [];
 
-  let chunkIndex = 0;
+  // First pass: create sentence-level spans
+  const sentenceSpanGroups: HTMLSpanElement[][] = [];
+  const sentenceTexts: string[] = [];
+  let sentenceIndex = 0;
 
   for (const segment of segments) {
     const trimmed = segment.text.trim();
-    if (trimmed.length === 0) continue; // Skip empty segments
+    if (trimmed.length === 0) continue;
 
-    // This segment becomes TTS chunk at index `chunkIndex`
-    chunks.push(trimmed);
+    sentenceTexts.push(trimmed);
 
-    // Find text nodes that intersect this segment
     const intersecting = findIntersectingNodes(
       segment.startOffset,
       segment.endOffset,
       offsets
     );
 
-    // Wrap each intersecting portion
     const spans: HTMLSpanElement[] = [];
     for (const { node, localStart, localEnd } of intersecting) {
-      // Check if node is still connected (previous wrapping may have moved it)
       if (!node.isConnected) continue;
-
-      const span = wrapTextNodePortion(
-        node,
-        localStart,
-        localEnd,
-        chunkIndex,
-        splitRecords
-      );
+      const span = wrapTextNodePortion(node, localStart, localEnd, sentenceIndex, splitRecords);
       spans.push(span);
     }
 
-    if (spans.length > 0) {
-      spanGroups.push(spans);
+    // Always push to keep indices aligned with sentenceTexts
+    sentenceSpanGroups.push(spans);
+    sentenceIndex++;
+  }
+
+  // Second pass: group sentences into ~150-word chunks
+  const groups = groupSentences(sentenceTexts);
+  const spanGroups: HTMLSpanElement[][] = [];
+  const chunks: string[] = [];
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    const indices = groups[gi];
+    const groupSpans: HTMLSpanElement[] = [];
+    const groupTexts: string[] = [];
+
+    for (const idx of indices) {
+      if (idx < sentenceSpanGroups.length) {
+        // Update data attribute to reflect the grouped chunk index
+        for (const span of sentenceSpanGroups[idx]) {
+          span.setAttribute('data-besttts-sentence', String(gi));
+        }
+        groupSpans.push(...sentenceSpanGroups[idx]);
+      }
+      groupTexts.push(sentenceTexts[idx]);
     }
 
-    chunkIndex++;
+    // Always push to keep spanGroups aligned with chunks (same index = same chunk)
+    spanGroups.push(groupSpans);
+    chunks.push(groupTexts.join(' '));
   }
 
   // Clear selection to avoid visual confusion

@@ -8,12 +8,12 @@
  * - Uses textContent and DOM methods instead of innerHTML for security
  */
 
-import type { HighlightState, SegmentBoundary } from './highlight-types';
+import type { HighlightState } from './highlight-types';
+import { groupSentences } from './text-chunker';
 import {
   getSegmentationLocale,
   segmentSentences,
   createScrollContext,
-  createEmptyHighlightState
 } from './highlight-manager';
 
 const OVERLAY_CONTAINER_ID = 'besttts-overlay-container';
@@ -77,66 +77,6 @@ function clearOverlayContainer(container: HTMLElement): void {
 }
 
 /**
- * Create overlay highlighting for extracted article content.
- * Returns HighlightState and chunks array (same segmentation guarantees alignment).
- *
- * Per CONTEXT.md single source of truth architecture:
- * - Content script does ONE segmentation
- * - Returns both state (DOM refs) and chunks (for TTS)
- * - chunks[i] === state.sentences[i] (guaranteed alignment)
- */
-export function createOverlayHighlighting(sourceText: string): {
-  state: HighlightState;
-  chunks: string[];
-} {
-  const locale = getSegmentationLocale();
-  const segments = segmentSentences(sourceText, locale);
-
-  // Create aligned chunks and spans
-  const container = getOrCreateOverlayContainer();
-  clearOverlayContainer(container); // Safe clear without innerHTML
-
-  const spanGroups: HTMLSpanElement[][] = [];
-  const chunks: string[] = [];
-
-  let chunkIndex = 0;
-  for (const segment of segments) {
-    const trimmed = segment.text.trim();
-    if (trimmed.length === 0) continue; // Skip empty segments
-
-    // This segment becomes TTS chunk at index `chunkIndex`
-    chunks.push(trimmed);
-
-    // Create span for this sentence
-    const span = document.createElement('span');
-    span.setAttribute('data-besttts-sentence', String(chunkIndex));
-    span.textContent = segment.text; // Keep original whitespace in display
-
-    container.appendChild(span);
-    spanGroups.push([span]); // Single span per sentence in overlay mode
-
-    chunkIndex++;
-  }
-
-  // Create scroll context for the overlay container
-  const scrollContext = createScrollContext(container);
-
-  const state: HighlightState = {
-    sourceText,
-    sentences: chunks,
-    spanGroups,
-    currentIndex: -1,
-    observer: null, // No mutation observer needed for overlay mode
-    scrollContext,
-    isValid: true,
-    splitRecords: [], // No split records needed for overlay mode
-    mode: 'overlay'
-  };
-
-  return { state, chunks };
-}
-
-/**
  * Render article title and content in overlay.
  * Returns highlight state and chunks.
  */
@@ -193,27 +133,43 @@ export function renderOverlayContent(
   container.appendChild(contentWrapper);
 
   // Now create highlighting in the content wrapper
+  // Sentences are grouped into ~150-word blocks for efficient TTS generation.
+  // Each spanGroup contains multiple sentence spans; highlightSentence highlights them all.
   const locale = getSegmentationLocale();
   const segments = segmentSentences(content, locale);
 
-  const spanGroups: HTMLSpanElement[][] = [];
-  const chunks: string[] = [];
-
-  let chunkIndex = 0;
+  // First: create all sentence spans
+  const allSentences: { text: string; trimmed: string; span: HTMLSpanElement }[] = [];
   for (const segment of segments) {
     const trimmed = segment.text.trim();
     if (trimmed.length === 0) continue;
 
-    chunks.push(trimmed);
-
     const span = document.createElement('span');
-    span.setAttribute('data-besttts-sentence', String(chunkIndex));
     span.textContent = segment.text;
-
     contentWrapper.appendChild(span);
-    spanGroups.push([span]);
+    allSentences.push({ text: segment.text, trimmed, span });
+  }
 
-    chunkIndex++;
+  // Second: group sentences into ~150-word chunks
+  const sentenceTexts = allSentences.map(s => s.trimmed);
+  const groups = groupSentences(sentenceTexts);
+
+  const spanGroups: HTMLSpanElement[][] = [];
+  const chunks: string[] = [];
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    const indices = groups[gi];
+    const groupSpans: HTMLSpanElement[] = [];
+    const groupTexts: string[] = [];
+
+    for (const idx of indices) {
+      allSentences[idx].span.setAttribute('data-besttts-sentence', String(gi));
+      groupSpans.push(allSentences[idx].span);
+      groupTexts.push(allSentences[idx].trimmed);
+    }
+
+    spanGroups.push(groupSpans);
+    chunks.push(groupTexts.join(' '));
   }
 
   const scrollContext = createScrollContext(container);

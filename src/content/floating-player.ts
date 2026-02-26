@@ -62,74 +62,94 @@ function getPlayerStyles(): string {
       pointer-events: auto;
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 12px 16px;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 14px;
-      color: #1a1a1a;
+      gap: 10px;
+      padding: 10px 16px;
+      background: #fafaf9;
+      border: 1px solid #e7e5e4;
+      border-radius: 14px;
+      box-shadow: 0 4px 15px rgba(28, 25, 23, 0.1), 0 1px 3px rgba(28, 25, 23, 0.06);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      color: #1c1917;
+      -webkit-font-smoothing: antialiased;
     }
 
     .player-btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border: none;
       border-radius: 50%;
-      background: #4a9eff;
-      color: white;
+      background: #d97706;
+      color: #fafaf9;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 15px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .player-btn:hover {
-      background: #3a8eef;
+      background: #b45309;
+      transform: scale(1.06);
+      box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+    }
+
+    .player-btn:active {
+      transform: scale(0.95);
     }
 
     .player-btn:focus {
-      outline: 2px solid #4a9eff;
+      outline: 2px solid #d97706;
       outline-offset: 2px;
     }
 
     .player-btn:disabled {
-      opacity: 0.5;
+      opacity: 0.35;
       cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
     }
 
     .player-btn.dismiss {
-      background: #e5e5e5;
-      color: #666;
-      width: 28px;
-      height: 28px;
-      font-size: 12px;
+      background: #e7e5e4;
+      color: #78716c;
+      width: 26px;
+      height: 26px;
+      font-size: 11px;
     }
 
     .player-btn.dismiss:hover {
-      background: #d5d5d5;
+      background: #d6d3d1;
+      color: #57534e;
+      box-shadow: none;
     }
 
     .progress-text {
-      min-width: 60px;
+      min-width: 55px;
       text-align: center;
       font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      color: #78716c;
+      font-weight: 500;
     }
 
     .speed-display {
-      min-width: 48px;
+      min-width: 44px;
       text-align: center;
       font-variant-numeric: tabular-nums;
       cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 4px;
-      transition: background-color 0.15s;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #57534e;
+      transition: all 0.15s ease;
     }
 
     .speed-display:hover {
-      background: rgba(0, 0, 0, 0.1);
+      background: rgba(28, 25, 23, 0.06);
+      color: #1c1917;
     }
 
     .hidden {
@@ -138,21 +158,43 @@ function getPlayerStyles(): string {
 
     @media (prefers-color-scheme: dark) {
       .player-container {
-        background: #2a2a2a;
-        color: #e5e5e5;
+        background: #292524;
+        border-color: #44403c;
+        color: #fafaf9;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      .player-btn {
+        background: #f59e0b;
+        color: #1c1917;
+      }
+
+      .player-btn:hover {
+        background: #fbbf24;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
       }
 
       .player-btn.dismiss {
-        background: #444;
-        color: #ccc;
+        background: #44403c;
+        color: #a8a29e;
       }
 
       .player-btn.dismiss:hover {
-        background: #555;
+        background: #57534e;
+        color: #d6d3d1;
+      }
+
+      .progress-text {
+        color: #a8a29e;
+      }
+
+      .speed-display {
+        color: #a8a29e;
       }
 
       .speed-display:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fafaf9;
       }
     }
   `;
@@ -297,6 +339,7 @@ export function createFloatingPlayer(options?: FloatingPlayerOptions): {
   // Track visibility and dismissed state
   let isVisible = false;
   let isHidden = false; // true when user explicitly dismissed
+  let previousAnnouncedStatus: PlayerUIState['status'] | null = null;
 
   /**
    * Show the player (if not idle).
@@ -361,6 +404,16 @@ export function createFloatingPlayer(options?: FloatingPlayerOptions): {
 
     // Update speed display ("X.Xx" format)
     speedDisplay.textContent = `${state.playbackSpeed.toFixed(2)}x`;
+
+    // Announce state transitions to screen readers (avoid redundant announcements)
+    if (state.status !== previousAnnouncedStatus) {
+      if (state.status === 'playing') {
+        announce(`Playing sentence ${state.currentChunk + 1} of ${state.totalChunks}`);
+      } else if (state.status === 'paused') {
+        announce('Paused');
+      }
+      previousAnnouncedStatus = state.status;
+    }
   }
 
   // Play/Pause button handler

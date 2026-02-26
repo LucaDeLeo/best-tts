@@ -15,6 +15,8 @@ export interface TextNodeOffset {
   node: Text;
   startOffset: number;  // Cumulative offset in concatenated string
   endOffset: number;
+  nodeSelectedStart: number; // Local start offset in the original text node
+  nodeSelectedEnd: number;   // Local end offset in the original text node
 }
 
 /**
@@ -57,6 +59,7 @@ export interface ScrollContext {
   container: HTMLElement | Window;
   userScrolledRecently: boolean;
   scrollTimeout: ReturnType<typeof setTimeout> | null;
+  scrollHandler: (() => void) | null;  // Stored for removal in cleanup
 }
 
 /**

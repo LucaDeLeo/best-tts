@@ -17,7 +17,7 @@ import type {
 let currentExtraction: ExtractionState | null = null;
 
 // Chunk metadata only (actual data stored in offscreen IndexedDB)
-const chunkMetadata = new Map<string, { receivedChunks: number; totalChunks: number }>();
+const chunkMetadata = new Map<string, { receivedChunks: Set<number>; totalChunks: number }>();
 
 // Warning timeout handles
 const warningTimeouts = new Map<string, number>();
@@ -100,10 +100,10 @@ export function trackChunkReceived(
   totalChunks: number
 ): void {
   if (!chunkMetadata.has(extractionId)) {
-    chunkMetadata.set(extractionId, { receivedChunks: 0, totalChunks });
+    chunkMetadata.set(extractionId, { receivedChunks: new Set<number>(), totalChunks });
   }
   const meta = chunkMetadata.get(extractionId)!;
-  meta.receivedChunks++;
+  meta.receivedChunks.add(chunkIndex);
 }
 
 /**
@@ -112,14 +112,19 @@ export function trackChunkReceived(
 export function allChunksReceived(extractionId: string): boolean {
   const meta = chunkMetadata.get(extractionId);
   if (!meta) return false;
-  return meta.receivedChunks === meta.totalChunks;
+  return meta.receivedChunks.size === meta.totalChunks;
 }
 
 /**
  * Get chunk metadata for an extraction.
  */
 export function getChunkMetadata(extractionId: string): { receivedChunks: number; totalChunks: number } | null {
-  return chunkMetadata.get(extractionId) || null;
+  const meta = chunkMetadata.get(extractionId);
+  if (!meta) return null;
+  return {
+    receivedChunks: meta.receivedChunks.size,
+    totalChunks: meta.totalChunks
+  };
 }
 
 /**

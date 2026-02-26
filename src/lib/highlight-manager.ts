@@ -93,7 +93,8 @@ export function createScrollContext(container: HTMLElement | Window): ScrollCont
   const ctx: ScrollContext = {
     container,
     userScrolledRecently: false,
-    scrollTimeout: null
+    scrollTimeout: null,
+    scrollHandler: null
   };
 
   const scrollTarget = container === window ? window : container;
@@ -106,6 +107,7 @@ export function createScrollContext(container: HTMLElement | Window): ScrollCont
     }, USER_SCROLL_DEBOUNCE_MS);
   };
 
+  ctx.scrollHandler = handleScroll;
   scrollTarget.addEventListener('scroll', handleScroll, { passive: true });
 
   return ctx;
@@ -116,8 +118,11 @@ export function createScrollContext(container: HTMLElement | Window): ScrollCont
  */
 export function destroyScrollContext(ctx: ScrollContext): void {
   if (ctx.scrollTimeout) clearTimeout(ctx.scrollTimeout);
-  // Note: Can't easily remove the scroll listener without storing the handler reference
-  // This is acceptable as cleanup removes the container itself in overlay mode
+  if (ctx.scrollHandler) {
+    const scrollTarget = ctx.container === window ? window : ctx.container;
+    scrollTarget.removeEventListener('scroll', ctx.scrollHandler);
+    ctx.scrollHandler = null;
+  }
 }
 
 /**

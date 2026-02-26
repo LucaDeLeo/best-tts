@@ -9,13 +9,13 @@ import {
 } from '../lib/messages';
 import { getSelectedText, extractArticle } from '../lib/content-extractor';
 import type { HighlightState } from '../lib/highlight-types';
-import { highlightSentence, clearHighlight, maybeScrollToSentence } from '../lib/highlight-manager';
+import { highlightSentence, maybeScrollToSentence } from '../lib/highlight-manager';
 import { createSelectionHighlighting, cleanupSelectionHighlighting } from '../lib/selection-highlighter';
 import { renderOverlayContent, removeOverlayContainer } from '../lib/overlay-highlighter';
 import { injectHighlightStyles, removeHighlightStyles } from './highlight-styles';
 import { createFloatingPlayer, destroyFloatingPlayer, type PlayerUIState } from './floating-player';
 
-console.log('Best TTS content script loaded');
+// Content script loaded
 
 // Current audio element
 let currentAudio: HTMLAudioElement | null = null;
@@ -47,8 +47,8 @@ let libraryContentLength: number | null = null;
 let autosaveInterval: ReturnType<typeof setInterval> | null = null;
 const AUTOSAVE_INTERVAL_MS = 10_000; // 10 seconds per CONTEXT.md
 
-// Track chunks for autosave (needed for chunkText)
-let currentChunks: string[] = [];
+// Track current chunk text for autosave resume matching
+let currentChunkText: string = '';
 
 // Message handler
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -105,16 +105,41 @@ async function handleMessage(message: any): Promise<any> {
 }
 
 async function handlePlayAudio(msg: PlayAudioMessage): Promise<{ success: boolean; error?: string }> {
-  const { audioData, audioMimeType, generationToken, chunkIndex, totalChunks, libraryItemId, libraryContentHash, libraryContentLength } = msg;
+  const {
+    audioData,
+    audioMimeType,
+    generationToken,
+    chunkIndex,
+    totalChunks,
+    chunkText,
+    libraryItemId: msgLibraryItemId,
+    libraryContentHash: msgLibraryContentHash,
+    libraryContentLength: msgLibraryContentLength
+  } = msg;
 
   // Track chunk info for floating player
   currentChunkIndex = chunkIndex;
   currentTotalChunks = totalChunks;
+  currentChunkText = chunkText || '';
 
   // Initialize library context for autosave (Phase 7)
-  // Only set up on first chunk (chunkIndex === 0) to avoid re-init on each chunk
-  if (libraryItemId && chunkIndex === 0) {
-    startLibraryPlayback(libraryItemId, libraryContentHash || '', libraryContentLength || 0, []);
+  // Reinitialize when starting a new library item OR when recovering from resume playback
+  // that starts at a non-zero chunk.
+  if (msgLibraryItemId) {
+    const nextHash = msgLibraryContentHash || '';
+    const nextLength = msgLibraryContentLength || 0;
+    const shouldStartLibraryPlayback =
+      libraryItemId !== msgLibraryItemId ||
+      libraryContentHash !== nextHash ||
+      libraryContentLength !== nextLength ||
+      autosaveInterval === null;
+
+    if (shouldStartLibraryPlayback) {
+      startLibraryPlayback(msgLibraryItemId, nextHash, nextLength);
+    }
+  } else if (libraryItemId) {
+    // New non-library playback should not keep autosaving the previous item.
+    clearLibraryContext();
   }
 
   // Initialize floating player if not exists
@@ -455,13 +480,11 @@ function cleanupHighlighting(): void {
 function startLibraryPlayback(
   itemId: string,
   contentHash: string,
-  contentLength: number,
-  chunks: string[]
+  contentLength: number
 ): void {
   libraryItemId = itemId;
   libraryContentHash = contentHash;
   libraryContentLength = contentLength;
-  currentChunks = chunks;
 
   // Clear any existing autosave interval
   if (autosaveInterval) clearInterval(autosaveInterval);
@@ -479,9 +502,9 @@ function startLibraryPlayback(
  * Called on interval (10s), pause, and stop.
  */
 function sendAutosavePosition(): void {
-  if (!libraryItemId || currentChunkIndex === undefined) return;
+  if (!libraryItemId) return;
 
-  const chunkText = currentChunks[currentChunkIndex]?.slice(0, 100) || '';
+  const chunkText = currentChunkText;
 
   chrome.runtime.sendMessage({
     target: 'service-worker',
@@ -508,20 +531,19 @@ function clearLibraryContext(): void {
   libraryItemId = null;
   libraryContentHash = null;
   libraryContentLength = null;
-  currentChunks = [];
+  currentChunkText = '';
 }
 
 /**
  * Set library context for autosave (called from external message).
  * This allows the popup/service worker to configure library playback.
  */
-export function setLibraryContext(
+function setLibraryContext(
   itemId: string,
   contentHash: string,
-  contentLength: number,
-  chunks: string[]
+  contentLength: number
 ): void {
-  startLibraryPlayback(itemId, contentHash, contentLength, chunks);
+  startLibraryPlayback(itemId, contentHash, contentLength);
 }
 
 /**
@@ -572,9 +594,9 @@ async function handleStatusUpdate(message: StatusUpdateMessage): Promise<{ succe
   let playerStatus: 'idle' | 'generating' | 'playing' | 'paused';
   if (status.isPlaying) {
     playerStatus = 'playing';
-  } else if ((status as { isPaused?: boolean }).isPaused) {
+  } else if (status.isPaused) {
     playerStatus = 'paused';
-  } else if ((status as { isGenerating?: boolean }).isGenerating) {
+  } else if (status.isGenerating) {
     playerStatus = 'generating';
   } else {
     playerStatus = 'idle';
@@ -582,14 +604,9 @@ async function handleStatusUpdate(message: StatusUpdateMessage): Promise<{ succe
 
   // Always track the latest state (even when dismissed)
   // This ensures state is fresh when player is restored
-  const statusExt = status as {
-    currentChunkIndex?: number;
-    totalChunks?: number;
-    playbackSpeed?: number;
-  };
-  currentChunkIndex = statusExt.currentChunkIndex ?? currentChunkIndex;
-  currentTotalChunks = statusExt.totalChunks ?? currentTotalChunks;
-  currentSpeed = statusExt.playbackSpeed ?? currentSpeed;
+  currentChunkIndex = status.currentChunkIndex ?? currentChunkIndex;
+  currentTotalChunks = status.totalChunks ?? currentTotalChunks;
+  currentSpeed = status.playbackSpeed ?? currentSpeed;
 
   // Reset dismissed state when going idle (so player shows on next playback)
   if (playerStatus === 'idle') {

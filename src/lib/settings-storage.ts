@@ -18,6 +18,14 @@ export interface Settings {
   darkMode: 'system' | 'light' | 'dark';
   /** In-panel keyboard shortcuts (not global Chrome shortcuts) */
   shortcuts: ShortcutBindings;
+  /** TTS engine: 'kokoro' (local WASM) or 'mlx-audio' (local server) */
+  engine: 'kokoro' | 'mlx-audio';
+  /** mlx-audio server base URL */
+  mlxAudioUrl: string;
+  /** mlx-audio model ID (empty = auto-detect from server) */
+  mlxAudioModel: string;
+  /** mlx-audio voice (separate from Kokoro voice setting) */
+  mlxAudioVoice: string;
 }
 
 /**
@@ -46,6 +54,10 @@ export const DEFAULT_SETTINGS: Settings = {
     speedUp: 'Equal',
     speedDown: 'Minus',
   },
+  engine: 'kokoro',
+  mlxAudioUrl: 'http://localhost:8000',
+  mlxAudioModel: '',
+  mlxAudioVoice: '',
 };
 
 const SETTINGS_KEY = 'settings';
@@ -60,13 +72,15 @@ export async function getSettings(): Promise<Settings> {
     return { ...DEFAULT_SETTINGS };
   }
 
+  const s = stored as Partial<Settings>;
+
   // Merge with defaults to handle missing keys (forward compatibility)
   return {
     ...DEFAULT_SETTINGS,
-    ...stored,
+    ...s,
     shortcuts: {
       ...DEFAULT_SETTINGS.shortcuts,
-      ...(stored.shortcuts || {}),
+      ...(s.shortcuts || {}),
     },
   };
 }
@@ -132,8 +146,8 @@ export async function migrateSettings(): Promise<boolean> {
     ...current,
     speed: typeof legacy.playbackSpeed === 'number' ? legacy.playbackSpeed : current.speed,
     voice: typeof legacy.selectedVoice === 'string' ? (legacy.selectedVoice as VoiceId) : current.voice,
-    darkMode: ['system', 'light', 'dark'].includes(legacy.darkMode)
-      ? legacy.darkMode
+    darkMode: typeof legacy.darkMode === 'string' && ['system', 'light', 'dark'].includes(legacy.darkMode)
+      ? (legacy.darkMode as Settings['darkMode'])
       : current.darkMode,
   };
 

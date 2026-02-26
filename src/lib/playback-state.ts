@@ -16,6 +16,7 @@ export interface PlaybackState {
   chunks: string[];               // Array of sentence texts
   currentChunkIndex: number;      // Which chunk is playing (0-based)
   totalChunks: number;
+  currentVoice: string | null;    // Voice selected when this playback started
 
   // Audio state
   // Note: Audio URL is created in content script (blob URLs are origin-bound)
@@ -38,6 +39,7 @@ const initialState: PlaybackState = {
   chunks: [],
   currentChunkIndex: 0,
   totalChunks: 0,
+  currentVoice: null,
   playbackSpeed: 1.0,
   activeTabId: null,
   lastHeartbeat: null,
@@ -70,7 +72,8 @@ export function updatePlaybackState(updates: Partial<PlaybackState>): PlaybackSt
  * Returns a copy of the reset state
  */
 export function resetPlaybackState(): PlaybackState {
-  state = { ...initialState };
+  const preservedSpeed = state.playbackSpeed;
+  state = { ...initialState, playbackSpeed: preservedSpeed };
   return { ...state };
 }
 

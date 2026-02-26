@@ -36,7 +36,14 @@ import {
   type UpdateSettingsMessage,
   type VoicePreviewMessage,
   type VoicePreviewResponse,
+  type MlxServerStatusMessage,
+  type MlxListVoicesMessage,
 } from '../lib/messages';
+import {
+  checkServerHealth,
+  generateSpeech,
+  getVoicesForModel,
+} from '../lib/mlx-audio-client';
 import {
   migrateSettings,
   getSettings,
@@ -81,7 +88,68 @@ import {
 import { getSelectedVoice } from '../lib/voice-storage';
 import { splitIntoChunks } from '../lib/text-chunker';
 
-console.log('Best TTS service worker loaded');
+// Service worker loaded
+
+// ── Continuous generation pipeline ────────────────────────
+// Generates ALL chunks as fast as the TTS engine allows, storing
+// results in a buffer. Playback reads from the buffer for
+// instant, gapless sentence transitions.
+interface GeneratedAudio {
+  audioData: string;
+  audioMimeType: string;
+}
+
+const audioBuffer: Map<number, GeneratedAudio> = new Map();
+let generationLoopToken: string | null = null;  // tracks active loop
+
+function clearAudioBuffer(): void {
+  audioBuffer.clear();
+  generationLoopToken = null;
+}
+
+/**
+ * Continuous generation loop — generates chunks as fast as possible
+ * starting from `fromIndex`. Runs in the background while audio plays.
+ * Stops when all chunks are generated, token changes, or playback stops.
+ */
+async function runGenerationLoop(fromIndex: number, token: string): Promise<void> {
+  generationLoopToken = token;
+  const state = getPlaybackState();
+  const voice = state.currentVoice || await getSelectedVoice();
+
+  for (let i = fromIndex; i < state.totalChunks; i++) {
+    // Stop if token changed (new playback session, stop, etc.)
+    if (getPlaybackState().generationToken !== token || generationLoopToken !== token) {
+      return;
+    }
+
+    // Skip chunks already in the buffer (e.g., first chunk generated synchronously)
+    if (audioBuffer.has(i)) continue;
+
+    const result = await generateChunk(
+      state.chunks[i],
+      voice,
+      i,
+      state.totalChunks,
+      token
+    );
+
+    // Verify token still matches after async generation
+    if (getPlaybackState().generationToken !== token || generationLoopToken !== token) {
+      return;
+    }
+
+    if (result.success && result.audioData) {
+      audioBuffer.set(i, {
+        audioData: result.audioData,
+        audioMimeType: result.audioMimeType || 'audio/wav',
+      });
+    } else {
+      // Generation failed for this chunk — log and continue to next
+      console.warn(`Generation loop: chunk ${i} failed, skipping`);
+    }
+  }
+}
 
 // Run settings migration on startup (one-time per install)
 migrateSettings().then(migrated => {
@@ -90,11 +158,18 @@ migrateSettings().then(migrated => {
   }
 });
 
-// Restore playback speed from storage on startup
-chrome.storage.local.get(['playbackSpeed']).then(({ playbackSpeed }) => {
-  if (typeof playbackSpeed === 'number') {
-    updatePlaybackState({ playbackSpeed });
-    console.log('Restored playback speed:', playbackSpeed);
+// Restore playback speed from unified settings on startup
+// and auto-detect mlx-audio server if configured
+getSettings().then(async (settings) => {
+  updatePlaybackState({ playbackSpeed: settings.speed });
+
+  // Auto-detect mlx-audio server on startup
+  if (settings.engine === 'mlx-audio') {
+    const status = await checkServerHealth(settings.mlxAudioUrl);
+    await chrome.storage.session.set({ mlxServerStatus: status });
+    if (status.online && status.models.length > 0 && !settings.mlxAudioModel) {
+      await updateSettings({ mlxAudioModel: status.models[0] });
+    }
   }
 });
 
@@ -136,31 +211,18 @@ type RoutableMessage = TTSMessage & {
 };
 
 // Union type for all messages handled by service worker
+// Includes TTSMessage union plus document extraction types (which use literal target/type fields)
 type ServiceWorkerMessage = TTSMessage
   | ExtractDocumentMessage
   | DocumentChunkMessage
   | DocumentChunkCompleteMessage
   | WarningResponseMessage
   | CancelExtractionMessage
-  | SaveToLibraryMessage
-  | GetLibraryStatusMessage
-  | AutosavePositionMessage
-  | GetLibraryItemMessage
-  | PlayLibraryItemMessage
-  | FolderCreateMessage
-  | FolderRenameMessage
-  | FolderDeleteMessage
   | { type: 'folder-list'; target: 'service-worker' }
-  | ItemMoveToFolderMessage
-  | GetLibraryItemsMessage
-  | DeleteLibraryItemMessage
-  | GetRecentItemsMessage
   | { type: 'get-pending-warning'; target: 'service-worker' }
   | { type: 'page-count-warning'; target: 'service-worker'; extractionId: string; pageCount: number; threshold: number }
   | { type: 'get-settings'; target: 'service-worker' }
-  | UpdateSettingsMessage
-  | { type: 'open-side-panel'; target: 'service-worker' }
-  | VoicePreviewMessage;
+  | { type: 'open-side-panel'; target: 'service-worker' };
 
 // Handle GET_TAB_ID requests - simple utility to let content script know its tab ID
 // This is used for rehydration logic to verify the content script is in the active playback tab
@@ -225,12 +287,12 @@ async function handleServiceWorkerMessage(
         const clampedSpeed = Math.max(0.5, Math.min(4.0, speed));
         updatePlaybackState({ playbackSpeed: clampedSpeed });
 
-        // Persist to storage
-        chrome.storage.local.set({ playbackSpeed: clampedSpeed });
+        // Persist to unified settings
+        updateSettings({ speed: clampedSpeed });
 
-        // Forward to active tab's content script if playing
+        // Forward to active tab's content script if playing or paused
         const currentState = getPlaybackState();
-        if (currentState.activeTabId && currentState.status === 'playing') {
+        if (currentState.activeTabId && (currentState.status === 'playing' || currentState.status === 'paused')) {
           chrome.tabs.sendMessage(currentState.activeTabId, {
             target: 'content-script',
             type: MessageType.SET_SPEED,
@@ -245,6 +307,7 @@ async function handleServiceWorkerMessage(
 
       case MessageType.STOP_PLAYBACK: {
         const prevState = getPlaybackState();
+        clearAudioBuffer();
         if (prevState.activeTabId) {
           chrome.tabs.sendMessage(prevState.activeTabId, {
             target: 'content-script',
@@ -306,7 +369,7 @@ async function handleServiceWorkerMessage(
             playChunk(nextIndex).catch(console.error);
           } else {
             // All chunks complete
-            updatePlaybackState({ status: 'idle' });
+            resetPlaybackState();
             broadcastStatusUpdate();
           }
         }
@@ -322,7 +385,7 @@ async function handleServiceWorkerMessage(
           console.error('Audio playback error from content script:', errMsg.error);
 
           // Reset playback state
-          updatePlaybackState({ status: 'idle' });
+          resetPlaybackState();
           broadcastStatusUpdate();
 
           // Forward error to popup for user feedback
@@ -347,6 +410,9 @@ async function handleServiceWorkerMessage(
           break;
         }
 
+        // Note: don't clear audioBuffer on skip — pre-generated chunks
+        // ahead of the target are still valid and will be used.
+
         // Stop current playback in content script
         if (skipState.activeTabId) {
           chrome.tabs.sendMessage(skipState.activeTabId, {
@@ -364,7 +430,7 @@ async function handleServiceWorkerMessage(
       case MessageType.TTS_GENERATE: {
         // Handle TTS_GENERATE directly to integrate highlighting
         // Per Phase 4: Initialize highlighting in content script, get chunks back
-        const { text, voice, libraryItemId, libraryContentHash, libraryContentLength } = message as TTSGenerateMessage;
+        const { text, voice, libraryItemId, libraryContentHash, libraryContentLength, startChunkIndex } = message as TTSGenerateMessage;
 
         if (!text || text.trim().length === 0) {
           sendResponse({ success: false, error: 'Text cannot be empty' });
@@ -388,7 +454,7 @@ async function handleServiceWorkerMessage(
             sendResponse({ success: false, error: 'No valid sentences found in text' });
             break;
           }
-          await startPlaybackWithChunks(fallbackChunks, voice, null, sendResponse, libraryContext);
+          await startPlaybackWithChunks(fallbackChunks, voice, null, sendResponse, libraryContext, startChunkIndex);
           break;
         }
 
@@ -423,12 +489,12 @@ async function handleServiceWorkerMessage(
               sendResponse({ success: false, error: 'No valid sentences found in text' });
               break;
             }
-            await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse, libraryContext);
+            await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse, libraryContext, startChunkIndex);
             break;
           }
 
           // Use chunks from highlighting (guaranteed DOM alignment)
-          await startPlaybackWithChunks(highlightResult.chunks, voice, tab.id, sendResponse, libraryContext);
+          await startPlaybackWithChunks(highlightResult.chunks, voice, tab.id, sendResponse, libraryContext, startChunkIndex);
         } catch (error) {
           // Content script error (not injected, etc.) - fallback
           console.warn('Could not communicate with content script:', error);
@@ -437,38 +503,38 @@ async function handleServiceWorkerMessage(
             sendResponse({ success: false, error: 'No valid sentences found in text' });
             break;
           }
-          await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse, libraryContext);
+          await startPlaybackWithChunks(fallbackChunks, voice, tab.id, sendResponse, libraryContext, startChunkIndex);
         }
         break;
       }
 
       // Document extraction messages (Phase 6)
       case MessageType.EXTRACT_DOCUMENT: {
-        const msg = message as unknown as ExtractDocumentMessage;
+        const msg = message as ExtractDocumentMessage;
         await handleExtractDocument(msg, sendResponse);
         break;
       }
 
       case MessageType.DOCUMENT_CHUNK: {
-        const msg = message as unknown as DocumentChunkMessage;
+        const msg = message as DocumentChunkMessage;
         await handleDocumentChunk(msg, sendResponse);
         break;
       }
 
       case MessageType.DOCUMENT_CHUNK_COMPLETE: {
-        const msg = message as unknown as DocumentChunkCompleteMessage;
+        const msg = message as DocumentChunkCompleteMessage;
         await handleDocumentChunkComplete(msg, sendResponse);
         break;
       }
 
       case MessageType.WARNING_RESPONSE: {
-        const msg = message as unknown as WarningResponseMessage;
+        const msg = message as WarningResponseMessage;
         await handleWarningResponse(msg, sendResponse);
         break;
       }
 
       case MessageType.CANCEL_EXTRACTION: {
-        const msg = message as unknown as CancelExtractionMessage;
+        const msg = message as CancelExtractionMessage;
         await handleCancelExtraction(msg, sendResponse);
         break;
       }
@@ -572,6 +638,7 @@ async function handleServiceWorkerMessage(
 
       case MessageType.SAVE_TO_LIBRARY: {
         const { item } = message as SaveToLibraryMessage;
+        const normalizedUrl = item.url.trim();
 
         // Check quota
         const quota = await getStorageEstimateForLibrary();
@@ -581,18 +648,21 @@ async function handleServiceWorkerMessage(
           break;
         }
 
-        // Check if already saved
-        const existing = await isUrlSaved(item.url);
-        if (existing) {
-          sendResponse({ success: true, alreadyExists: true, itemId: existing.id });
-          break;
+        // Check if already saved for URL-backed content.
+        // Imported files can have empty URL and should not all dedupe to one item.
+        if (normalizedUrl) {
+          const existing = await isUrlSaved(normalizedUrl);
+          if (existing) {
+            sendResponse({ success: true, alreadyExists: true, itemId: existing.id });
+            break;
+          }
         }
 
         // Create and save
         const libraryItemToSave: LibraryItem = {
           id: crypto.randomUUID(),
           title: item.title,
-          url: item.url,
+          url: normalizedUrl,
           source: item.source,
           folderId: item.folderId || null,
           createdAt: Date.now(),
@@ -740,6 +810,28 @@ async function handleServiceWorkerMessage(
         break;
       }
 
+      case MessageType.MLX_SERVER_STATUS: {
+        const mlxMsg = message as MlxServerStatusMessage;
+        const mlxSettings = await getSettings();
+        const baseUrl = mlxMsg.baseUrl || mlxSettings.mlxAudioUrl;
+        const status = await checkServerHealth(baseUrl);
+        // Cache result in session storage for quick UI reads
+        await chrome.storage.session.set({ mlxServerStatus: status });
+        // Auto-populate model if empty and server is online
+        if (status.online && status.models.length > 0 && !mlxSettings.mlxAudioModel) {
+          await updateSettings({ mlxAudioModel: status.models[0] });
+        }
+        sendResponse({ success: true, ...status });
+        break;
+      }
+
+      case MessageType.MLX_LIST_VOICES: {
+        const { model } = message as MlxListVoicesMessage;
+        const voices = getVoicesForModel(model);
+        sendResponse({ success: true, voices });
+        break;
+      }
+
       default:
         sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
     }
@@ -752,18 +844,35 @@ async function handleServiceWorkerMessage(
 }
 
 /**
- * Handle voice preview request - forward to offscreen document
- * Per CONTEXT.md Decision #5: Generate in offscreen, return audio data to side panel
+ * Handle voice preview request.
+ * mlx-audio: generates directly via HTTP. Kokoro: forwards to offscreen document.
  */
 async function handleVoicePreviewRequest(
   voice: string,
   sendResponse: (response: VoicePreviewResponse) => void
 ): Promise<void> {
   try {
-    // Ensure offscreen document is ready
-    await ensureOffscreenDocument();
+    const settings = await getSettings();
 
-    // Forward to offscreen
+    if (settings.engine === 'mlx-audio') {
+      const result = await generateSpeech({
+        baseUrl: settings.mlxAudioUrl,
+        model: settings.mlxAudioModel,
+        text: 'This is a preview of the selected voice.',
+        voice,
+        speed: settings.speed,
+      });
+      sendResponse({
+        success: result.success,
+        audioData: result.audioData,
+        audioMimeType: result.audioMimeType,
+        error: result.error,
+      });
+      return;
+    }
+
+    // Kokoro: forward to offscreen document
+    await ensureOffscreenDocument();
     const response = await chrome.runtime.sendMessage({
       target: 'offscreen',
       type: MessageType.VOICE_PREVIEW,
@@ -801,25 +910,9 @@ async function routeToOffscreen(
     const offscreenMessage = { ...rest, target: 'offscreen' as const };
 
     // Forward message to offscreen document
+    // Note: TTS_GENERATE is handled by handleServiceWorkerMessage directly (not forwarded).
+    // This function only routes TTS_INIT, TTS_LIST_VOICES, etc. to offscreen.
     const response = await chrome.runtime.sendMessage(offscreenMessage);
-
-    // Handle TTS_GENERATE response - store chunks and start playback
-    if (message.type === MessageType.TTS_GENERATE && response.success && response.chunks) {
-      const token = generateToken();
-      updatePlaybackState({
-        status: 'generating',
-        generationToken: token,
-        chunks: response.chunks,
-        totalChunks: response.chunks.length,
-        currentChunkIndex: 0
-      });
-      console.log(`Stored ${response.chunks.length} chunks with token ${token}`);
-      // Include generation token in response for client use
-      response.generationToken = token;
-
-      // Start playing first chunk (don't await - let it run async)
-      playChunk(0).catch(console.error);
-    }
 
     sendResponse(response);
   } catch (error) {
@@ -871,7 +964,9 @@ function broadcastStatusUpdate(): void {
 }
 
 /**
- * Play a specific chunk by generating audio and sending to content script
+ * Play a specific chunk by sending audio to content script.
+ * Reads from the audio buffer when possible (instant), or waits
+ * for the generation loop to produce the chunk.
  */
 async function playChunk(chunkIndex: number): Promise<void> {
   const state = getPlaybackState();
@@ -879,83 +974,86 @@ async function playChunk(chunkIndex: number): Promise<void> {
   // Validate state
   if (chunkIndex >= state.totalChunks || !state.generationToken) {
     console.log('No more chunks or invalid state');
-    updatePlaybackState({ status: 'idle' });
+    resetPlaybackState();
+    clearAudioBuffer();
     broadcastStatusUpdate();
     return;
   }
 
-  // Use stored activeTabId to avoid routing to wrong tab on tab switch
   const tabId = state.activeTabId;
   if (!tabId) {
     console.error('No active tab for playback');
-    updatePlaybackState({ status: 'idle' });
+    resetPlaybackState();
+    clearAudioBuffer();
     broadcastStatusUpdate();
     return;
   }
 
-  updatePlaybackState({
-    status: 'generating',
-    currentChunkIndex: chunkIndex
-  });
-  broadcastStatusUpdate();
-
-  // Generate chunk audio
   const chunkText = state.chunks[chunkIndex];
-  const voice = await getSelectedVoice();
+  let audio: GeneratedAudio | undefined = audioBuffer.get(chunkIndex);
 
-  const result = await generateChunk(
-    chunkText,
-    voice,
-    chunkIndex,
-    state.totalChunks,
-    state.generationToken
-  );
+  if (audio) {
+    // Buffer HIT — instant playback, no generation wait
+    console.log(`Buffer HIT for chunk ${chunkIndex} (${audioBuffer.size} buffered)`);
+    audioBuffer.delete(chunkIndex); // free memory for played chunk
+  } else {
+    // Buffer MISS — generate on demand (first chunk, or generation loop hasn't caught up)
+    console.log(`Buffer MISS for chunk ${chunkIndex}, generating on demand`);
 
-  // Check if generation was cancelled (token mismatch)
-  // Note: This is "soft cancellation" - the TTSEngine has no abort API, so generation
-  // runs to completion but results are discarded. This is acceptable for Phase 2
-  // because: (1) typical chunk generation is fast (<1s), (2) discarding prevents
-  // stale audio from playing, (3) true cancellation would require TTSEngine changes.
-  const currentState = getPlaybackState();
-  if (currentState.generationToken !== state.generationToken) {
-    console.log('Generation cancelled (token mismatch) - discarding result');
-    // No blob URL to revoke - audio data is base64 string (garbage collected)
-    return;
-  }
-
-  if (!result.success || !result.audioData) {
-    console.error('Chunk generation failed:', result.error);
-    updatePlaybackState({ status: 'idle' });
+    updatePlaybackState({
+      status: 'generating',
+      currentChunkIndex: chunkIndex
+    });
     broadcastStatusUpdate();
-    return;
+
+    const voice = state.currentVoice || await getSelectedVoice();
+    const result = await generateChunk(
+      chunkText,
+      voice,
+      chunkIndex,
+      state.totalChunks,
+      state.generationToken
+    );
+
+    // Check if generation was cancelled (token mismatch)
+    if (getPlaybackState().generationToken !== state.generationToken) {
+      console.log('Generation cancelled (token mismatch) - discarding result');
+      return;
+    }
+
+    if (!result.success || !result.audioData) {
+      console.error('Chunk generation failed:', result.error);
+      resetPlaybackState();
+      broadcastStatusUpdate();
+      return;
+    }
+
+    audio = { audioData: result.audioData, audioMimeType: result.audioMimeType || 'audio/wav' };
   }
 
-  // Send audio data to content script (NOT blob URL - those are origin-bound)
+  updatePlaybackState({ currentChunkIndex: chunkIndex });
+
+  // Send audio to content script
   try {
     const response = await chrome.tabs.sendMessage(tabId, {
       target: 'content-script',
       type: MessageType.PLAY_AUDIO,
-      audioData: result.audioData,           // base64-encoded audio
-      audioMimeType: result.audioMimeType,   // MIME type for blob creation
+      audioData: audio.audioData,
+      audioMimeType: audio.audioMimeType,
       generationToken: state.generationToken,
-      chunkIndex: chunkIndex,                // Index for highlighting
-      totalChunks: state.totalChunks,        // Total chunks for progress
-      // Library context for autosave (Phase 7)
+      chunkIndex: chunkIndex,
+      totalChunks: state.totalChunks,
+      chunkText: chunkText.slice(0, 100),
       libraryItemId: state.libraryItemId,
       libraryContentHash: state.libraryContentHash,
       libraryContentLength: state.libraryContentLength
     });
 
     if (response.success) {
-      updatePlaybackState({
-        status: 'playing'
-        // Note: Audio URL is created in content script, not stored here
-      });
+      updatePlaybackState({ status: 'playing' });
     } else {
-      // Autoplay blocked or other error
       console.error('Content script playback failed:', response.error);
-      updatePlaybackState({ status: 'idle' });
-      // Send error to popup
+      resetPlaybackState();
       chrome.runtime.sendMessage({
         target: 'popup',
         type: MessageType.AUDIO_ERROR,
@@ -965,15 +1063,16 @@ async function playChunk(chunkIndex: number): Promise<void> {
     broadcastStatusUpdate();
   } catch (error) {
     console.error('Failed to send to content script:', error);
-    updatePlaybackState({ status: 'idle' });
+    resetPlaybackState();
     broadcastStatusUpdate();
   }
 }
 
 /**
- * Request chunk generation from offscreen document
- * Returns base64-encoded audio data (not blob URL) for cross-origin transfer
- * The content script will receive the audio data and create its own blob URL.
+ * Request chunk generation from the active engine.
+ * mlx-audio: fetches directly from localhost server (skips offscreen).
+ * Kokoro: forwards to offscreen WASM document (unchanged).
+ * Returns base64-encoded audio data for cross-origin transfer.
  */
 async function generateChunk(
   chunkText: string,
@@ -982,6 +1081,19 @@ async function generateChunk(
   totalChunks: number,
   generationToken: string
 ): Promise<{ success: boolean; audioData?: string; audioMimeType?: string; error?: string }> {
+  const settings = await getSettings();
+
+  if (settings.engine === 'mlx-audio') {
+    return generateSpeech({
+      baseUrl: settings.mlxAudioUrl,
+      model: settings.mlxAudioModel,
+      text: chunkText,
+      voice: settings.mlxAudioVoice || voice,
+      speed: settings.speed,
+    });
+  }
+
+  // Kokoro: existing offscreen flow
   await ensureOffscreenDocument();
 
   const response = await chrome.runtime.sendMessage({
@@ -996,10 +1108,6 @@ async function generateChunk(
 
   return response;
 }
-
-// Reference to prevent unused function warning
-// generateChunk is called by playChunk above
-void generateChunk;
 
 /**
  * Library context for autosave tracking
@@ -1019,16 +1127,19 @@ async function startPlaybackWithChunks(
   voice: string,
   tabId: number | null,
   sendResponse: (response: TTSResponse & { generationToken?: string; chunks?: string[] }) => void,
-  libraryContext?: LibraryContext | null
+  libraryContext?: LibraryContext | null,
+  startChunkIndex?: number
 ): Promise<void> {
   const token = generateToken();
+  const safeStartIndex = Math.max(0, Math.min(startChunkIndex ?? 0, chunks.length - 1));
 
   updatePlaybackState({
     status: 'generating',
     generationToken: token,
     chunks,
     totalChunks: chunks.length,
-    currentChunkIndex: 0,
+    currentChunkIndex: safeStartIndex,
+    currentVoice: voice,
     activeTabId: tabId,
     // Store library context for autosave (Phase 7)
     libraryItemId: libraryContext?.libraryItemId || null,
@@ -1036,10 +1147,18 @@ async function startPlaybackWithChunks(
     libraryContentLength: libraryContext?.libraryContentLength || null
   });
 
-  console.log(`Starting playback with ${chunks.length} chunks, token ${token}${libraryContext?.libraryItemId ? ` (library: ${libraryContext.libraryItemId})` : ''}`);
+  console.log(`Starting playback with ${chunks.length} chunks at index ${safeStartIndex}, token ${token}${libraryContext?.libraryItemId ? ` (library: ${libraryContext.libraryItemId})` : ''}`);
 
-  // Start playing first chunk asynchronously
-  playChunk(0).catch(console.error);
+  // Clear any stale audio from a previous session
+  clearAudioBuffer();
+
+  // Start playing the first chunk (generates on demand since buffer is empty)
+  playChunk(safeStartIndex).catch(console.error);
+
+  // Start the continuous generation loop for remaining chunks.
+  // Runs in the background — generates as fast as the TTS engine allows,
+  // storing results in audioBuffer for instant playback on chunk advance.
+  runGenerationLoop(safeStartIndex + 1, token).catch(console.error);
 
   // Respond immediately with success and the token
   sendResponse({
@@ -1554,8 +1673,12 @@ async function handleWarningResponse(
       });
     } else {
       pageCountResolver(true); // Tell offscreen to continue
-      // Don't send response yet - extraction will complete and respond later
-      // The offscreen will send the final result
+      // Acknowledge immediately so the popup message channel doesn't time out.
+      // The original EXTRACT_DOCUMENT call returns the final extraction result.
+      sendResponse({
+        success: true,
+        extractionId
+      });
     }
     return;
   }
@@ -1721,9 +1844,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (state.activeTabId !== tabId) return;
 
   if (changeInfo.status === 'loading') {
+    // Stop background generation on navigation; buffered audio is page-context specific.
+    clearAudioBuffer();
+
     // Hard navigation started - audio will stop, content script destroyed
     // Mark state as paused so rehydration shows correct state
-    if (state.status === 'playing') {
+    if (state.status === 'playing' || state.status === 'generating') {
       console.log('Hard navigation detected in active tab, marking as paused for rehydration');
       // Update state to paused - audio element will be destroyed by navigation
       // so we can't continue playing. User will need to resume manually.

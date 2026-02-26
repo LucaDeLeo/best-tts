@@ -12,85 +12,93 @@ import {
   type PendingWarning,
   type SaveToLibraryResponse,
 } from '../lib/messages';
-import { getSelectedVoice, setSelectedVoice } from '../lib/voice-storage';
+import { getSelectedVoice, setSelectedVoice, formatVoiceName, GRADE_A_VOICES } from '../lib/voice-storage';
 import { getDownloadProgress } from '../lib/model-cache';
-import { getSettings } from '../lib/settings-storage';
+import { getSettings, updateSettings } from '../lib/settings-storage';
+import { sendToServiceWorker } from '../lib/messaging';
 import type { VoiceId } from '../lib/tts-engine';
 import type { LibraryItem } from '../lib/library-types';
 
-// DOM Elements
-const statusIndicator = document.getElementById('status-indicator')!;
-const progressSection = document.getElementById('progress-section')!;
-const progressPercent = document.getElementById('progress-percent')!;
-const progressFill = document.getElementById('progress-fill')!;
-const progressFile = document.getElementById('progress-file')!;
-const mainSection = document.getElementById('main-section')!;
-const textInput = document.getElementById('text-input') as HTMLTextAreaElement;
-const voiceSelect = document.getElementById('voice-select') as HTMLSelectElement;
-const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
-const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement;
-const stopBtn = document.getElementById('stop-btn') as HTMLButtonElement;
-const message = document.getElementById('message')!;
-const errorSection = document.getElementById('error-section')!;
-const errorMessage = document.getElementById('error-message')!;
-const retryBtn = document.getElementById('retry-btn') as HTMLButtonElement;
+// DOM element helper - throws descriptive error if element missing
+function $(id: string): HTMLElement {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Missing DOM element: #${id}`);
+  return el;
+}
 
-// New playback control elements
-const speedSlider = document.getElementById('speed-slider') as HTMLInputElement;
-const speedValue = document.getElementById('speed-value')!;
-const progressIndicator = document.getElementById('progress-indicator')!;
-const sentenceProgress = document.getElementById('sentence-progress')!;
-const sentenceFill = document.getElementById('sentence-fill')!;
-const skipBackBtn = document.getElementById('skip-back-btn') as HTMLButtonElement;
-const skipForwardBtn = document.getElementById('skip-forward-btn') as HTMLButtonElement;
+// DOM Elements
+const statusIndicator = $('status-indicator');
+const progressSection = $('progress-section');
+const progressPercent = $('progress-percent');
+const progressFill = $('progress-fill');
+const progressFile = $('progress-file');
+const mainSection = $('main-section');
+const textInput = $('text-input') as HTMLTextAreaElement;
+const voiceSelect = $('voice-select') as HTMLSelectElement;
+const playBtn = $('play-btn') as HTMLButtonElement;
+const pauseBtn = $('pause-btn') as HTMLButtonElement;
+const stopBtn = $('stop-btn') as HTMLButtonElement;
+const message = $('message');
+const errorSection = $('error-section');
+const errorMessage = $('error-message');
+const retryBtn = $('retry-btn') as HTMLButtonElement;
+
+// Playback control elements
+const speedSlider = $('speed-slider') as HTMLInputElement;
+const speedValue = $('speed-value');
+const progressIndicator = $('progress-indicator');
+const sentenceProgress = $('sentence-progress');
+const sentenceFill = $('sentence-fill');
+const skipBackBtn = $('skip-back-btn') as HTMLButtonElement;
+const skipForwardBtn = $('skip-forward-btn') as HTMLButtonElement;
 
 // Extraction elements
-const readPageBtn = document.getElementById('read-page-btn') as HTMLButtonElement;
-const readSelectionBtn = document.getElementById('read-selection-btn') as HTMLButtonElement;
-const extractionStatus = document.getElementById('extraction-status')!;
-const extractionSource = document.getElementById('extraction-source')!;
-const clearExtractionBtn = document.getElementById('clear-extraction-btn') as HTMLButtonElement;
+const readPageBtn = $('read-page-btn') as HTMLButtonElement;
+const readSelectionBtn = $('read-selection-btn') as HTMLButtonElement;
+const extractionStatus = $('extraction-status');
+const extractionSource = $('extraction-source');
+const clearExtractionBtn = $('clear-extraction-btn') as HTMLButtonElement;
 
 // File import elements
-const fileInput = document.getElementById('file-input') as HTMLInputElement;
-const importFileBtn = document.getElementById('import-file-btn') as HTMLButtonElement;
-const fileSizeWarning = document.getElementById('file-size-warning')!;
-const fileSizeMessage = document.getElementById('file-size-message')!;
-const fileCancelBtn = document.getElementById('file-cancel-btn') as HTMLButtonElement;
-const fileContinueBtn = document.getElementById('file-continue-btn') as HTMLButtonElement;
-const importProgress = document.getElementById('import-progress')!;
-const importFilename = document.getElementById('import-filename')!;
-const cancelImportBtn = document.getElementById('cancel-import-btn') as HTMLButtonElement;
-const importProgressFill = document.getElementById('import-progress-fill')!;
-const importProgressText = document.getElementById('import-progress-text')!;
-const importStatus = document.getElementById('import-status')!;
-const importSource = document.getElementById('import-source')!;
-const clearImportBtn = document.getElementById('clear-import-btn') as HTMLButtonElement;
+const fileInput = $('file-input') as HTMLInputElement;
+const importFileBtn = $('import-file-btn') as HTMLButtonElement;
+const fileSizeWarning = $('file-size-warning');
+const fileSizeMessage = $('file-size-message');
+const fileCancelBtn = $('file-cancel-btn') as HTMLButtonElement;
+const fileContinueBtn = $('file-continue-btn') as HTMLButtonElement;
+const importProgress = $('import-progress');
+const importFilename = $('import-filename');
+const cancelImportBtn = $('cancel-import-btn') as HTMLButtonElement;
+const importProgressFill = $('import-progress-fill');
+const importProgressText = $('import-progress-text');
+const importStatus = $('import-status');
+const importSource = $('import-source');
+const clearImportBtn = $('clear-import-btn') as HTMLButtonElement;
 
 // Show player button (restores dismissed floating player)
-const showPlayerBtn = document.getElementById('show-player-btn') as HTMLButtonElement;
+const showPlayerBtn = $('show-player-btn') as HTMLButtonElement;
 
 // Save to Library buttons
-const saveToLibraryBtn = document.getElementById('save-to-library-btn') as HTMLButtonElement;
-const saveImportToLibraryBtn = document.getElementById('save-import-to-library-btn') as HTMLButtonElement;
+const saveToLibraryBtn = $('save-to-library-btn') as HTMLButtonElement;
+const saveImportToLibraryBtn = $('save-import-to-library-btn') as HTMLButtonElement;
 
 // Recent Items elements
-const recentSection = document.getElementById('recent-section')!;
-const recentList = document.getElementById('recent-list')!;
-const viewAllBtn = document.getElementById('view-all-btn') as HTMLButtonElement;
+const recentSection = $('recent-section');
+const recentList = $('recent-list');
+const viewAllBtn = $('view-all-btn') as HTMLButtonElement;
 
 // Library Panel elements
-const librarySection = document.getElementById('library-section')!;
-const libraryToggleBtn = document.getElementById('library-toggle-btn') as HTMLButtonElement;
-const libraryBackBtn = document.getElementById('library-back-btn') as HTMLButtonElement;
-const folderList = document.getElementById('folder-list')!;
-const newFolderInput = document.getElementById('new-folder-input') as HTMLInputElement;
-const createFolderBtn = document.getElementById('create-folder-btn') as HTMLButtonElement;
-const libraryItemsList = document.getElementById('library-items-list')!;
-const itemActions = document.getElementById('item-actions')!;
-const moveToFolderSelect = document.getElementById('move-to-folder-select') as HTMLSelectElement;
-const playItemBtn = document.getElementById('play-item-btn') as HTMLButtonElement;
-const deleteItemBtn = document.getElementById('delete-item-btn') as HTMLButtonElement;
+const librarySection = $('library-section');
+const libraryToggleBtn = $('library-toggle-btn') as HTMLButtonElement;
+const libraryBackBtn = $('library-back-btn') as HTMLButtonElement;
+const folderList = $('folder-list');
+const newFolderInput = $('new-folder-input') as HTMLInputElement;
+const createFolderBtn = $('create-folder-btn') as HTMLButtonElement;
+const libraryItemsList = $('library-items-list');
+const itemActions = $('item-actions');
+const moveToFolderSelect = $('move-to-folder-select') as HTMLSelectElement;
+const playItemBtn = $('play-item-btn') as HTMLButtonElement;
+const deleteItemBtn = $('delete-item-btn') as HTMLButtonElement;
 
 // Port for service worker communication (keeps SW alive during extraction)
 let extractionPort: chrome.runtime.Port | null = null;
@@ -119,6 +127,7 @@ let currentDocumentTitle: string | null = null;
 let currentLibraryItemId: string | null = null;
 let currentLibraryContentHash: string | null = null;
 let currentLibraryContentLength: number | null = null;
+let pendingStartChunkIndex: number | null = null;
 
 // Library panel state
 let libraryPanelOpen = false;
@@ -231,7 +240,6 @@ async function openSidePanel() {
  * Initialize popup
  */
 async function init() {
-  console.log('Popup initializing...');
 
   // Apply theme from settings (Phase 8)
   await applyTheme();
@@ -286,6 +294,37 @@ async function init() {
 
   // Load recent library items
   await loadRecentItems();
+
+  // Restore playback state if active (popup is ephemeral — destroyed on click-away)
+  try {
+    const state = await sendToServiceWorker<{
+      success: boolean;
+      status: string;
+      isPlaying: boolean;
+      isGenerating: boolean;
+      isPaused: boolean;
+      currentChunkIndex: number;
+      totalChunks: number;
+      playbackSpeed: number;
+    }>(MessageType.GET_STATUS);
+
+    if (state.success && state.status !== 'idle') {
+      currentChunkIndex = state.currentChunkIndex ?? 0;
+      totalChunks = state.totalChunks ?? 0;
+      isPlaying = state.isPlaying ?? false;
+      isGenerating = state.isGenerating ?? false;
+      playbackSpeed = state.playbackSpeed ?? 1.0;
+      speedSlider.value = String(playbackSpeed);
+      speedValue.textContent = `${playbackSpeed}x`;
+      updatePlayPauseUI();
+      updateGeneratingUI();
+      if (isPlaying || state.isPaused) {
+        showMessage(isPlaying ? 'Playing...' : 'Paused', 'success');
+      }
+    }
+  } catch {
+    // Service worker may not be ready yet — will get STATUS_UPDATE push later
+  }
 
   // Check for pending extraction (from context menu OR popup that closed mid-extraction)
   await loadPendingExtraction();
@@ -386,18 +425,21 @@ async function initializeTTS() {
       voiceSelect.value = savedVoice;
     }
 
-    // Restore saved speed setting
-    const { playbackSpeed: savedSpeed } = await chrome.storage.local.get(['playbackSpeed']);
-    if (typeof savedSpeed === 'number') {
-      playbackSpeed = savedSpeed;
-      speedSlider.value = String(savedSpeed);
-      speedValue.textContent = `${savedSpeed}x`;
+    // Restore saved speed from unified settings (unless already restored from live playback)
+    if (totalChunks === 0) {
+      const settings = await getSettings();
+      playbackSpeed = settings.speed;
+      speedSlider.value = String(settings.speed);
+      speedValue.textContent = `${settings.speed}x`;
     }
 
     isInitialized = true;
     setStatus('ready');
     hideProgress();
-    showMessage('Ready to speak!', 'success');
+    // Don't overwrite status if playback is already active (restored from service worker)
+    if (!isPlaying && !isGenerating && totalChunks === 0) {
+      showMessage('Ready to speak!', 'success');
+    }
     updatePlayButtonState();
   } catch (error) {
     console.error('TTS initialization failed:', error);
@@ -424,14 +466,12 @@ async function loadVoices() {
       voiceSelect.removeChild(voiceSelect.firstChild);
     }
 
-    // Categorize voices by quality grade
-    const gradeA = ['af_heart', 'af_bella', 'af_nicole', 'af_sarah', 'af_sky', 'am_adam', 'am_michael'];
     const voices = response.voices;
 
     // Sort voices: Grade A first, then alphabetically
     voices.sort((a, b) => {
-      const aIsGradeA = gradeA.includes(a);
-      const bIsGradeA = gradeA.includes(b);
+      const aIsGradeA = GRADE_A_VOICES.includes(a);
+      const bIsGradeA = GRADE_A_VOICES.includes(b);
       if (aIsGradeA && !bIsGradeA) return -1;
       if (!aIsGradeA && bIsGradeA) return 1;
       return a.localeCompare(b);
@@ -441,12 +481,7 @@ async function loadVoices() {
     for (const voice of voices) {
       const option = document.createElement('option');
       option.value = voice;
-
-      // Format voice name for display
-      const displayName = formatVoiceName(voice);
-      const isHighQuality = gradeA.includes(voice);
-      option.textContent = isHighQuality ? `${displayName} (High Quality)` : displayName;
-
+      option.textContent = formatVoiceName(voice, GRADE_A_VOICES.includes(voice));
       voiceSelect.appendChild(option);
     }
   } catch (error) {
@@ -460,39 +495,6 @@ async function loadVoices() {
     defaultOption.textContent = 'Default Voice';
     voiceSelect.appendChild(defaultOption);
   }
-}
-
-/**
- * Format voice ID to display name
- */
-function formatVoiceName(voiceId: string): string {
-  // af_heart -> Heart (American Female)
-  // am_michael -> Michael (American Male)
-  // bf_emma -> Emma (British Female)
-  const parts = voiceId.split('_');
-  if (parts.length !== 2) return voiceId;
-
-  const [prefix, name] = parts;
-  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-
-  const accents: Record<string, string> = {
-    'a': 'American',
-    'b': 'British'
-  };
-
-  const genders: Record<string, string> = {
-    'f': 'Female',
-    'm': 'Male'
-  };
-
-  const accent = accents[prefix[0]] || '';
-  const gender = genders[prefix[1]] || '';
-
-  if (accent && gender) {
-    return `${capitalizedName} (${accent} ${gender})`;
-  }
-
-  return capitalizedName;
 }
 
 /**
@@ -521,7 +523,8 @@ async function handlePlay() {
         // Include library context for autosave (Phase 7)
         libraryItemId: currentLibraryItemId || undefined,
         libraryContentHash: currentLibraryContentHash || undefined,
-        libraryContentLength: currentLibraryContentLength || undefined
+        libraryContentLength: currentLibraryContentLength || undefined,
+        startChunkIndex: currentLibraryItemId !== null ? (pendingStartChunkIndex ?? 0) : undefined
       }
     );
 
@@ -574,6 +577,7 @@ function handlePlaybackComplete() {
   currentLibraryItemId = null;
   currentLibraryContentHash = null;
   currentLibraryContentLength = null;
+  pendingStartChunkIndex = null;
 }
 
 /**
@@ -655,8 +659,8 @@ async function handleSpeedChange() {
   playbackSpeed = speed;
   speedValue.textContent = `${speed}x`;
 
-  // Persist to storage
-  await chrome.storage.local.set({ playbackSpeed: speed });
+  // Persist to unified settings
+  await updateSettings({ speed });
 
   // Send to service worker to update playback rate
   try {
@@ -826,27 +830,6 @@ function updateGeneratingUI() {
   } else {
     playBtn.classList.remove('loading');
   }
-}
-
-/**
- * Send message to service worker
- */
-async function sendToServiceWorker<T>(
-  type: string,
-  payload?: Record<string, unknown>
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(
-      { target: 'service-worker', type, ...payload },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(response);
-        }
-      }
-    );
-  });
 }
 
 /**
@@ -1032,15 +1015,22 @@ async function triggerExtraction(messageType: string) {
         return;
       }
 
+      // Timeout after 15s (content script has 10s internal timeout)
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Extraction timed out'));
+      }, 15000);
+
       // Handle response from service worker
       extractionPort.onMessage.addListener((message) => {
         if (message.type === 'EXTRACTION_RESPONSE') {
+          clearTimeout(timeoutId);
           resolve(message.result as ExtractionResult);
         }
       });
 
       // Handle port disconnect (SW crashed or similar)
       extractionPort.onDisconnect.addListener(() => {
+        clearTimeout(timeoutId);
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
         }
@@ -1051,11 +1041,6 @@ async function triggerExtraction(messageType: string) {
         type: messageType,
         tabId: tab.id
       });
-
-      // Timeout after 15s (content script has 10s internal timeout)
-      setTimeout(() => {
-        reject(new Error('Extraction timed out'));
-      }, 15000);
     });
 
     if (!result.success) {
@@ -1177,6 +1162,10 @@ function showExtractedContent(result: ExtractionResult) {
   currentDocumentTitle = result.title || null;
 
   // Reset library state for new extraction
+  currentLibraryItemId = null;
+  currentLibraryContentHash = null;
+  currentLibraryContentLength = null;
+  pendingStartChunkIndex = null;
   isSavedToLibrary = false;
   updateSaveButtonState();
 
@@ -1209,6 +1198,10 @@ function clearExtraction() {
   extractionStatus.classList.add('hidden');
   currentDocumentUrl = null;
   currentDocumentTitle = null;
+  currentLibraryItemId = null;
+  currentLibraryContentHash = null;
+  currentLibraryContentLength = null;
+  pendingStartChunkIndex = null;
   isSavedToLibrary = false;
   updateSaveButtonState();
   updatePlayButtonState();
@@ -1444,6 +1437,10 @@ function handleExtractionResult(result: DocumentExtractionResult, filename: stri
   currentDocumentTitle = filename;
 
   // Reset library state for new import
+  currentLibraryItemId = null;
+  currentLibraryContentHash = null;
+  currentLibraryContentLength = null;
+  pendingStartChunkIndex = null;
   isSavedToLibrary = false;
   updateSaveButtonState();
 
@@ -1642,6 +1639,7 @@ async function playRecentItem(itemId: string) {
     currentLibraryItemId = itemId;
     currentLibraryContentHash = response.contentHash || response.item.contentHash;
     currentLibraryContentLength = response.content.length;
+    pendingStartChunkIndex = response.startChunkIndex ?? 0;
 
     // Populate text input
     textInput.value = response.content;
@@ -2039,7 +2037,9 @@ async function handlePlayItem() {
     const response = await sendToServiceWorker<{
       success: boolean;
       content?: string;
-      item?: LibraryItemData;
+      item?: LibraryItem;
+      contentHash?: string;
+      startChunkIndex?: number;
       error?: string;
     }>(MessageType.PLAY_LIBRARY_ITEM, { itemId: selectedItemId });
 
@@ -2055,6 +2055,10 @@ async function handlePlayItem() {
       textInput.value = response.content;
       currentDocumentTitle = item.title;
       currentDocumentUrl = item.url;
+      currentLibraryItemId = selectedItemId;
+      currentLibraryContentHash = response.contentHash || response.item?.contentHash || '';
+      currentLibraryContentLength = response.content.length;
+      pendingStartChunkIndex = response.startChunkIndex ?? 0;
       isSavedToLibrary = true;
       updateSaveButtonState();
       updatePlayButtonState();

@@ -18,7 +18,22 @@ import { splitIntoChunks } from '../lib/text-chunker';
 import { extractTextFile } from '../lib/text-file-extractor';
 import { extractPdfText } from '../lib/pdf-extractor';
 
-console.log('Best TTS offscreen document loaded');
+// Offscreen document loaded
+
+/**
+ * Convert ArrayBuffer to base64 string efficiently.
+ * Uses chunked btoa to avoid creating massive intermediate strings.
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const CHUNK = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const slice = bytes.subarray(i, i + CHUNK);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
+}
 
 // ============================================================================
 // IndexedDB Chunk Storage (per CONTEXT.md Decision #2)
@@ -87,14 +102,13 @@ async function deleteChunksFromDb(extractionId: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    // Delete all keys starting with extractionId
-    const request = store.openCursor();
+    // Use key range to only iterate matching keys (extractionId-*)
+    const range = IDBKeyRange.bound(extractionId + '-', extractionId + '-\uffff');
+    const request = store.openCursor(range);
     request.onsuccess = (event) => {
       const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
       if (cursor) {
-        if (cursor.key.toString().startsWith(extractionId)) {
-          cursor.delete();
-        }
+        cursor.delete();
         cursor.continue();
       }
     };
@@ -155,7 +169,7 @@ interface CleanupChunksMessage {
   extractionId: string;
 }
 
-interface CancelExtractionMessage {
+interface OffscreenCancelExtractionMessage {
   target: 'offscreen';
   type: 'cancel-extraction';
   extractionId: string;
@@ -169,7 +183,7 @@ type OffscreenHandledMessage =
   | StoreChunkMessage
   | ExtractFromChunksMessage
   | CleanupChunksMessage
-  | CancelExtractionMessage;
+  | OffscreenCancelExtractionMessage;
 
 // Message handler
 chrome.runtime.onMessage.addListener((message: OffscreenHandledMessage, sender, sendResponse) => {
@@ -215,7 +229,7 @@ async function handleMessage(message: OffscreenHandledMessage): Promise<TTSRespo
       return handleGetStatus();
 
     case MessageType.EXTRACT_DOCUMENT:
-      return handleExtractDocument(message as unknown as OffscreenExtractMessage);
+      return handleExtractDocument(message as OffscreenExtractMessage);
 
     // Chunk storage messages (per CONTEXT.md Decision #2)
     case MessageType.INIT_CHUNK_STORAGE: {
@@ -297,7 +311,7 @@ async function handleMessage(message: OffscreenHandledMessage): Promise<TTSRespo
     }
 
     case MessageType.CANCEL_EXTRACTION: {
-      const msg = message as CancelExtractionMessage;
+      const msg = message as OffscreenCancelExtractionMessage;
       // Abort any active extraction
       const controller = activeAbortControllers.get(msg.extractionId);
       if (controller) {
@@ -438,9 +452,7 @@ async function handleGenerateChunk(msg: TTSGenerateChunkMessage): Promise<ChunkR
     // Convert blob to base64 for cross-origin transfer
     // Blob URLs are origin-bound; content scripts cannot load offscreen blob URLs
     const arrayBuffer = await blob.arrayBuffer();
-    const base64 = btoa(
-      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-    );
+    const base64 = arrayBufferToBase64(arrayBuffer);
 
     return {
       success: true,
@@ -522,9 +534,7 @@ async function handleVoicePreview(voice: string): Promise<VoicePreviewResponse> 
 
     // Convert blob to base64 for cross-context transfer
     const arrayBuffer = await audioBlob.arrayBuffer();
-    const base64 = btoa(
-      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-    );
+    const base64 = arrayBufferToBase64(arrayBuffer);
 
     return {
       success: true,

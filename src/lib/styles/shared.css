@@ -1,71 +1,97 @@
-/* Shared Component Styles
- * Per CONTEXT.md Decision #10: Shared UI components for popup and side panel
- * Import theme.css first for variable definitions
+/* Best TTS — Shared Components
+ * Foundation layer imported by popup and side panel
  */
 @import './theme.css';
 
-/* Reset */
-* {
+/* ── Reset ────────────────────────────────────────────── */
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-/* Base typography */
+/* ── Base ─────────────────────────────────────────────── */
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-primary);
   background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Buttons */
+/* ── Custom scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Buttons ──────────────────────────────────────────── */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 9px 16px;
   border: none;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 550;
+  letter-spacing: 0.01em;
   cursor: pointer;
   transition: all var(--transition-fast);
+  user-select: none;
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.35;
   cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .btn-primary {
   background: var(--accent-color);
   color: var(--text-inverse);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .btn-primary:active:not(:disabled) {
   background: var(--accent-active);
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary {
   background: var(--bg-secondary);
   color: var(--text-secondary);
+  border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover:not(:disabled) {
   background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .btn-tertiary {
   background: transparent;
   color: var(--accent-color);
-  border: 1px solid var(--accent-color);
+  border: 1.5px solid var(--accent-color);
 }
 
 .btn-tertiary:hover:not(:disabled) {
@@ -73,8 +99,9 @@ body {
 }
 
 .btn.small {
-  padding: 6px 12px;
+  padding: 5px 12px;
   font-size: 12px;
+  border-radius: var(--radius-sm);
 }
 
 .btn.loading::after {
@@ -86,42 +113,47 @@ body {
   border: 2px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin 0.7s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* Icon buttons */
+/* ── Icon buttons ─────────────────────────────────────── */
 .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   background: transparent;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  padding: 0;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  font-size: 15px;
   transition: all var(--transition-fast);
 }
 
 .icon-btn:hover {
   background: var(--bg-secondary);
   color: var(--text-primary);
+  border-color: var(--text-muted);
 }
 
-/* Form elements */
+/* ── Form elements ────────────────────────────────────── */
 input[type="text"],
 input[type="number"],
 textarea,
 select {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 14px;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 13px;
   color: var(--text-primary);
-  background: var(--bg-primary);
+  background: var(--bg-surface);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -129,8 +161,8 @@ input:focus,
 textarea:focus,
 select:focus {
   outline: none;
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px var(--accent-light);
+  border-color: var(--accent-color);
+  box-shadow: var(--accent-glow);
 }
 
 input::placeholder,
@@ -138,28 +170,30 @@ textarea::placeholder {
   color: var(--text-muted);
 }
 
-/* Cards */
+/* ── Cards ────────────────────────────────────────────── */
 .card {
-  background: var(--bg-primary);
+  background: var(--bg-surface);
   border: 1px solid var(--border-light);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px;
+  box-shadow: var(--shadow-xs);
 }
 
 .card-hover:hover {
   border-color: var(--accent-color);
   background: var(--bg-highlight);
+  box-shadow: var(--shadow-sm);
 }
 
-/* List items */
+/* ── List items ───────────────────────────────────────── */
 .list-item {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid var(--border-light);
-  border-radius: 6px;
-  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -167,11 +201,13 @@ textarea::placeholder {
 .list-item:hover {
   border-color: var(--accent-color);
   background: var(--bg-highlight);
+  transform: translateX(2px);
 }
 
 .list-item.selected {
   border-color: var(--accent-color);
   background: var(--bg-highlight);
+  box-shadow: inset 3px 0 0 var(--accent-color);
 }
 
 .list-item-content {
@@ -182,6 +218,7 @@ textarea::placeholder {
 
 .list-item-title {
   font-weight: 500;
+  font-size: 13px;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -189,74 +226,48 @@ textarea::placeholder {
 }
 
 .list-item-meta {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
+  margin-top: 1px;
 }
 
-/* Status badge */
+/* ── Badges ───────────────────────────────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
-.badge-success {
-  background: var(--success-bg);
-  color: var(--success-color);
-}
+.badge-success { background: var(--success-bg); color: var(--success-color); }
+.badge-error   { background: var(--error-bg);   color: var(--error-color); }
+.badge-warning { background: var(--warning-bg); color: var(--warning-color); }
 
-.badge-error {
-  background: var(--error-bg);
-  color: var(--error-color);
-}
-
-.badge-warning {
-  background: var(--warning-bg);
-  color: var(--warning-color);
-}
-
-/* Messages */
+/* ── Messages ─────────────────────────────────────────── */
 .message {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   text-align: center;
 }
 
-.message.error {
-  color: var(--error-color);
-}
+.message.error   { color: var(--error-color); }
+.message.success { color: var(--success-color); }
 
-.message.success {
-  color: var(--success-color);
-}
-
-/* Empty state */
+/* ── Empty state ──────────────────────────────────────── */
 .empty-state {
   text-align: center;
-  padding: 40px 20px;
+  padding: 32px 20px;
   color: var(--text-muted);
+  font-size: 13px;
 }
 
-/* Utility classes */
-.hidden {
-  display: none !important;
-}
-
-.flex {
-  display: flex;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.gap-2 {
-  gap: 8px;
-}
-
-.gap-4 {
-  gap: 16px;
-}
+/* ── Utilities ────────────────────────────────────────── */
+.hidden { display: none !important; }
+.flex   { display: flex; }
+.flex-1 { flex: 1; }
+.gap-2  { gap: 8px; }
+.gap-4  { gap: 16px; }

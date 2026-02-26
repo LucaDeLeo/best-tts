@@ -1,108 +1,136 @@
-/* Theme CSS Variables
- * Per CONTEXT.md Decision #3: CSS custom properties with .dark-mode class
+/* Best TTS Design System
+ * Warm Stone palette + Amber accent
+ * Crafted for an audio-first experience
  */
 
 :root {
-  /* Background colors */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #e5e5e5;
-  --bg-highlight: #f0f7ff;
-  --bg-warning: #fff3cd;
+  /* Typography */
+  --font-display: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'Cascadia Code', monospace;
+
+  /* Background colors — Warm Stone */
+  --bg-primary: #fafaf9;
+  --bg-secondary: #f5f5f4;
+  --bg-tertiary: #e7e5e4;
+  --bg-highlight: #fffbeb;
+  --bg-warning: #fef3c7;
+  --bg-surface: #ffffff;
 
   /* Text colors */
-  --text-primary: #1a1a1a;
-  --text-secondary: #525252;
-  --text-muted: #737373;
-  --text-inverse: #ffffff;
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --text-muted: #a8a29e;
+  --text-inverse: #fafaf9;
 
   /* Border colors */
-  --border-color: #d4d4d4;
-  --border-light: #e5e5e5;
-  --border-focus: #3b82f6;
+  --border-color: #d6d3d1;
+  --border-light: #e7e5e4;
+  --border-focus: #d97706;
 
-  /* Accent colors */
-  --accent-color: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-active: #1d4ed8;
-  --accent-light: rgba(59, 130, 246, 0.1);
+  /* Accent colors — Amber */
+  --accent-color: #d97706;
+  --accent-hover: #b45309;
+  --accent-active: #92400e;
+  --accent-light: rgba(217, 119, 6, 0.08);
+  --accent-glow: 0 0 0 3px rgba(217, 119, 6, 0.15);
 
   /* Status colors */
-  --success-color: #22c55e;
+  --success-color: #16a34a;
   --success-bg: #dcfce7;
-  --error-color: #ef4444;
+  --error-color: #dc2626;
   --error-bg: #fef2f2;
-  --warning-color: #f59e0b;
+  --warning-color: #d97706;
   --warning-bg: #fef3c7;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  /* Shadows — Warm tint */
+  --shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.04);
+  --shadow-sm: 0 1px 3px rgba(28, 25, 23, 0.06), 0 1px 2px rgba(28, 25, 23, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(28, 25, 23, 0.07), 0 2px 4px -2px rgba(28, 25, 23, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(28, 25, 23, 0.08), 0 4px 6px -4px rgba(28, 25, 23, 0.04);
+  --shadow-glow: 0 0 20px rgba(217, 119, 6, 0.15);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
 
   /* Transitions */
-  --transition-fast: 0.15s ease;
-  --transition-normal: 0.2s ease;
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Dark mode overrides */
+/* ── Dark mode ────────────────────────────────────────── */
 :root.dark-mode,
 .dark-mode {
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #2a2a2a;
-  --bg-tertiary: #3a3a3a;
-  --bg-highlight: #1a2a3a;
-  --bg-warning: #3d3200;
+  --bg-primary: #1c1917;
+  --bg-secondary: #292524;
+  --bg-tertiary: #44403c;
+  --bg-highlight: #2a2017;
+  --bg-warning: #422006;
+  --bg-surface: #292524;
 
-  --text-primary: #e5e5e5;
-  --text-secondary: #a3a3a3;
-  --text-muted: #737373;
-  --text-inverse: #1a1a1a;
+  --text-primary: #fafaf9;
+  --text-secondary: #a8a29e;
+  --text-muted: #78716c;
+  --text-inverse: #1c1917;
 
-  --border-color: #404040;
-  --border-light: #333333;
-  --border-focus: #60a5fa;
+  --border-color: #44403c;
+  --border-light: #353130;
+  --border-focus: #f59e0b;
 
-  --accent-color: #60a5fa;
-  --accent-hover: #3b82f6;
-  --accent-active: #2563eb;
-  --accent-light: rgba(96, 165, 250, 0.15);
+  --accent-color: #f59e0b;
+  --accent-hover: #fbbf24;
+  --accent-active: #f59e0b;
+  --accent-light: rgba(245, 158, 11, 0.1);
+  --accent-glow: 0 0 0 3px rgba(245, 158, 11, 0.2);
 
-  --success-bg: #14532d;
+  --success-bg: #052e16;
   --error-bg: #450a0a;
   --warning-bg: #422006;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 20px rgba(245, 158, 11, 0.2);
 }
 
-/* System preference support - applied when no explicit preference is set */
+/* ── System preference fallback ───────────────────────── */
 @media (prefers-color-scheme: dark) {
   :root:not(.light-mode) {
-    --bg-primary: #1a1a1a;
-    --bg-secondary: #2a2a2a;
-    --bg-tertiary: #3a3a3a;
-    --bg-highlight: #1a2a3a;
-    --bg-warning: #3d3200;
+    --bg-primary: #1c1917;
+    --bg-secondary: #292524;
+    --bg-tertiary: #44403c;
+    --bg-highlight: #2a2017;
+    --bg-warning: #422006;
+    --bg-surface: #292524;
 
-    --text-primary: #e5e5e5;
-    --text-secondary: #a3a3a3;
-    --text-muted: #737373;
-    --text-inverse: #1a1a1a;
+    --text-primary: #fafaf9;
+    --text-secondary: #a8a29e;
+    --text-muted: #78716c;
+    --text-inverse: #1c1917;
 
-    --border-color: #404040;
-    --border-light: #333333;
-    --border-focus: #60a5fa;
+    --border-color: #44403c;
+    --border-light: #353130;
+    --border-focus: #f59e0b;
 
-    --accent-color: #60a5fa;
-    --accent-hover: #3b82f6;
-    --accent-active: #2563eb;
-    --accent-light: rgba(96, 165, 250, 0.15);
+    --accent-color: #f59e0b;
+    --accent-hover: #fbbf24;
+    --accent-active: #f59e0b;
+    --accent-light: rgba(245, 158, 11, 0.1);
+    --accent-glow: 0 0 0 3px rgba(245, 158, 11, 0.2);
 
-    --success-bg: #14532d;
+    --success-bg: #052e16;
     --error-bg: #450a0a;
     --warning-bg: #422006;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+    --shadow-glow: 0 0 20px rgba(245, 158, 11, 0.2);
   }
 }

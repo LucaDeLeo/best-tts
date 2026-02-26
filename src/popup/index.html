@@ -4,22 +4,37 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <title>Best TTS</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>Best TTS</h1>
+      <div class="brand">
+        <svg class="brand-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="1" y="8" width="3" height="8" rx="1.5" fill="currentColor" opacity="0.5"/>
+          <rect x="6" y="5" width="3" height="14" rx="1.5" fill="currentColor" opacity="0.7"/>
+          <rect x="11" y="2" width="3" height="20" rx="1.5" fill="currentColor"/>
+          <rect x="16" y="5" width="3" height="14" rx="1.5" fill="currentColor" opacity="0.7"/>
+          <rect x="21" y="8" width="3" height="8" rx="1.5" fill="currentColor" opacity="0.5"/>
+        </svg>
+        <h1>Best TTS</h1>
+      </div>
       <div class="header-actions">
         <button id="library-toggle-btn" class="btn-icon" title="Library">
-          <span class="icon">&#128218;</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
         </button>
         <span id="status-indicator" class="status-indicator"></span>
       </div>
     </header>
 
-    <!-- Download Progress (shown during model download) -->
+    <!-- Download Progress -->
     <div id="progress-section" class="progress-section hidden">
       <div class="progress-label">
         <span>Downloading model...</span>
@@ -31,7 +46,7 @@
       <p id="progress-file" class="progress-file"></p>
     </div>
 
-    <!-- Recent Items Section (shown when library has items) -->
+    <!-- Recent Items -->
     <div id="recent-section" class="recent-section hidden">
       <div class="recent-header">
         <span class="recent-title">Recent</span>
@@ -40,22 +55,33 @@
       <ul id="recent-list" class="recent-list"></ul>
     </div>
 
-    <!-- Main Controls (shown when ready) -->
+    <!-- Main Controls -->
     <div id="main-section" class="main-section">
       <!-- Extraction Section -->
       <div class="extraction-section">
         <div class="extraction-buttons">
           <button id="read-page-btn" class="btn secondary" title="Extract and read this page">
-            Read This Page
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            Read Page
           </button>
           <button id="read-selection-btn" class="btn secondary" title="Read selected text">
-            Read Selection
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 7 4 4 20 4 20 7"/>
+              <line x1="9" y1="20" x2="15" y2="20"/>
+              <line x1="12" y1="4" x2="12" y2="20"/>
+            </svg>
+            Selection
           </button>
         </div>
         <div id="extraction-status" class="extraction-status hidden">
           <span id="extraction-source"></span>
           <button id="save-to-library-btn" class="btn secondary small" title="Save to library">Save</button>
-          <button id="clear-extraction-btn" class="btn-icon" title="Clear">&#10005;</button>
+          <button id="clear-extraction-btn" class="btn-icon-only" title="Clear">&#10005;</button>
         </div>
       </div>
 
@@ -63,17 +89,19 @@
       <div class="section file-import-section">
         <div class="section-header">Import Document</div>
         <div class="file-import-row">
-          <input type="file"
-                 id="file-input"
-                 accept=".pdf,.txt,.md"
-                 class="hidden">
+          <input type="file" id="file-input" accept=".pdf,.txt,.md" class="hidden">
           <button id="import-file-btn" class="btn secondary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
             Import File
           </button>
           <span id="supported-formats" class="hint">PDF, TXT, MD</span>
         </div>
 
-        <!-- File size warning dialog (hidden by default) -->
+        <!-- File size warning -->
         <div id="file-size-warning" class="warning-dialog hidden">
           <div class="warning-content">
             <div class="warning-icon">Warning</div>
@@ -88,7 +116,7 @@
           </div>
         </div>
 
-        <!-- Import progress (hidden by default) -->
+        <!-- Import progress -->
         <div id="import-progress" class="import-progress hidden">
           <div class="import-progress-header">
             <span id="import-filename">filename.pdf</span>
@@ -100,7 +128,7 @@
           <span id="import-progress-text" class="progress-text">Uploading...</span>
         </div>
 
-        <!-- Import status (shown after import) -->
+        <!-- Import status -->
         <div id="import-status" class="extraction-status hidden">
           <span id="import-source"></span>
           <button id="save-import-to-library-btn" class="btn secondary small" title="Save to library">Save</button>
@@ -111,11 +139,7 @@
       <!-- Text Input -->
       <div class="input-group">
         <label for="text-input">Text to speak</label>
-        <textarea
-          id="text-input"
-          placeholder="Enter text to convert to speech..."
-          rows="4"
-        ></textarea>
+        <textarea id="text-input" placeholder="Paste or type text here..." rows="3"></textarea>
       </div>
 
       <!-- Voice Selection -->
@@ -128,7 +152,7 @@
 
       <!-- Speed Control -->
       <div class="control-row">
-        <label for="speed-slider">Speed:</label>
+        <label for="speed-slider">Speed</label>
         <input type="range" id="speed-slider" min="0.5" max="4" step="0.25" value="1">
         <span id="speed-value">1x</span>
       </div>
@@ -143,40 +167,49 @@
 
       <!-- Playback Controls -->
       <div class="button-row">
-        <button id="skip-back-btn" class="control-btn" disabled title="Previous sentence (Left Arrow)">
-          <span class="icon">&#9198;</span>
+        <button id="skip-back-btn" class="control-btn" disabled title="Previous sentence">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+          </svg>
         </button>
-        <button id="play-btn" class="btn btn-primary" disabled>
-          <span class="btn-text">Speak</span>
-          <span class="btn-loading hidden">Generating...</span>
+        <button id="play-btn" class="btn btn-primary play-hero" disabled>
+          <span class="btn-text">Play</span>
+          <span class="btn-loading hidden">
+            <span class="generating-dots">
+              <span></span><span></span><span></span>
+            </span>
+          </span>
         </button>
-        <button id="pause-btn" class="btn btn-primary hidden" disabled>Pause</button>
-        <button id="skip-forward-btn" class="control-btn" disabled title="Next sentence (Right Arrow)">
-          <span class="icon">&#9197;</span>
+        <button id="pause-btn" class="btn btn-primary play-hero hidden" disabled>Pause</button>
+        <button id="skip-forward-btn" class="control-btn" disabled title="Next sentence">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+          </svg>
         </button>
-        <button id="stop-btn" class="btn btn-secondary" disabled>
-          Stop
-        </button>
+        <button id="stop-btn" class="btn btn-secondary stop-btn" disabled>Stop</button>
       </div>
 
-      <!-- Show Floating Player (visible when playback active and player may be dismissed) -->
+      <!-- Show Floating Player -->
       <button id="show-player-btn" class="btn btn-tertiary hidden" title="Restore the floating player on the page">
         Show Player
       </button>
 
       <div class="shortcuts-hint">
-        <small>Space: Play/Pause | Arrows: Skip | +/-: Speed</small>
+        <small>Space: Play/Pause &middot; Arrows: Skip &middot; +/-: Speed</small>
       </div>
 
       <!-- Status Messages -->
       <p id="message" class="message"></p>
     </div>
 
-    <!-- Library Panel (Phase 7) -->
+    <!-- Library Panel -->
     <div id="library-section" class="library-section hidden">
       <div class="library-header">
         <button id="library-back-btn" class="btn-icon" title="Back to player">
-          <span class="icon">&#8592;</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"/>
+            <polyline points="12 19 5 12 12 5"/>
+          </svg>
         </button>
         <h2>Library</h2>
       </div>
@@ -184,7 +217,7 @@
       <!-- Folder List -->
       <div class="library-folders">
         <div class="folder-item active" data-folder-id="root">
-          <span class="folder-icon">&#128193;</span>
+          <span class="folder-icon">&#128218;</span>
           <span class="folder-name">All Items</span>
         </div>
         <div id="folder-list"></div>
@@ -201,7 +234,7 @@
         </div>
       </div>
 
-      <!-- Item Actions (shown when item selected) -->
+      <!-- Item Actions -->
       <div id="item-actions" class="item-actions hidden">
         <select id="move-to-folder-select" class="folder-select">
           <option value="">Move to folder...</option>

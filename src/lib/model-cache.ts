@@ -1,5 +1,3 @@
-import { get, set, del } from 'idb-keyval';
-
 const CACHE_STATUS_KEY = 'tts-model-cache-status';
 const DOWNLOAD_PROGRESS_KEY = 'downloadProgress';
 
@@ -15,8 +13,8 @@ export interface CacheStatus {
  */
 export async function getCacheStatus(): Promise<CacheStatus | null> {
   try {
-    const status = await get<CacheStatus>(CACHE_STATUS_KEY);
-    return status ?? null;
+    const result = await chrome.storage.local.get(CACHE_STATUS_KEY);
+    return (result[CACHE_STATUS_KEY] as CacheStatus | undefined) ?? null;
   } catch {
     return null;
   }
@@ -26,7 +24,7 @@ export async function getCacheStatus(): Promise<CacheStatus | null> {
  * Set model cache status
  */
 export async function setCacheStatus(status: CacheStatus): Promise<void> {
-  await set(CACHE_STATUS_KEY, status);
+  await chrome.storage.local.set({ [CACHE_STATUS_KEY]: status });
 }
 
 /**
@@ -35,10 +33,7 @@ export async function setCacheStatus(status: CacheStatus): Promise<void> {
 export async function clearModelCache(): Promise<void> {
   // Note: This clears our status tracking
   // The actual model cache is managed by transformers.js
-  await del(CACHE_STATUS_KEY);
-
-  // Clear download progress
-  await chrome.storage.local.remove(DOWNLOAD_PROGRESS_KEY);
+  await chrome.storage.local.remove([CACHE_STATUS_KEY, DOWNLOAD_PROGRESS_KEY]);
 }
 
 /**
