@@ -21,3 +21,6 @@ npm-debug.log*
 # Local env
 .env
 .env.local
+
+# Reference project
+OpenWebTTS/
